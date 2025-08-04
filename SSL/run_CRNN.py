@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader, Dataset, DistributedSampler
 import numpy as np
 #import Dataset2 as at_dataset
 import Module as at_module
-import baselines.SSL.CRNN as at_model
+import SSL.CRNN as at_model
 from utils.my_save_config_callback import MySaveConfigCallback as SaveConfigCallback
 from utils import tag_and_log_git_status
 from utils import MyLogger as TensorBoardLogger
@@ -29,22 +29,18 @@ torch.backends.cudnn.allow_tf32 = True
 #opts = opt()
 #dirs = opts.dir()
 
-dataset_train = RealData(data_dir='/data/home/RealisticAudio/RealMAN/',
-                target_dir=['/data/home/RealisticAudio/RealMAN/train/train_static_source_location.csv',
-                            '/data/home/RealisticAudio/RealMAN/train/train_moving_source_location.csv'],
-                noise_dir='/data/home/RealisticAudio/RealMAN/train/ma_noise/')
+dataset_train = RealData(data_dir='E:/RealMAN/',
+                target_dir=['E:/RealMAN/train/train_static_source_location.csv'],
+                noise_dir='E:/RealMAN/train/ma_noise/')
 
-dataset_val = RealData(data_dir='/data/home/RealisticAudio/RealMAN/',
-                target_dir=['/data/home/RealisticAudio/RealMAN/val/val_static_source_location.csv',
-                            '/data/home/RealisticAudio/RealMAN/val/val_moving_source_location.csv'],
-                noise_dir='/data/home/RealisticAudio/RealMAN/val/ma_noise/',
+dataset_val = RealData(data_dir='E:/RealMAN/',
+                target_dir=['E:/RealMAN/val/val_static_source_location.csv'],
+                noise_dir='E:/RealMAN/val/ma_noise/',
                 on_the_fly=False)
 
-dataset_test = RealData(data_dir='/data/home/RealisticAudio/RealMAN/',
-                target_dir=[#'/data/home/RealisticAudio/RealMAN/test/test_static_source_location.csv',
-                            '/data/home/RealisticAudio/RealMAN/test/test_moving_source_location.csv'
-                            ],
-                noise_dir='/data/home/RealisticAudio/RealMAN/test/ma_noise/',
+dataset_test = RealData(data_dir='E:/RealMAN/',
+                target_dir=['E:/RealMAN/test/test_static_source_location.csv'],
+                noise_dir='E:/RealMAN/test/ma_noise/',
                 on_the_fly=False)
 
 class MyDataModule(LightningDataModule):

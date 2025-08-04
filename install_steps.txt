@@ -1,0 +1,13 @@
+huggingface-cli download AISHELL/RealMAN --repo-type dataset --local-dir RealMAN
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+
+requirements.txt
+
+jsonargparse
+pytorch-lightning
+numpy
+scipy
+matplotlib
+pandas
+
+pip install -r requirements.txt

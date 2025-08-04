@@ -8,12 +8,13 @@
 
 
 import math
-from typing import Iterator, Optional
+from typing import Iterator, Optional, TypeVar
+T_co = TypeVar('T_co', covariant=True)
 
 import torch
 from pytorch_lightning.utilities.rank_zero import rank_zero_warn
 from torch.utils.data import Dataset
-from torch.utils.data.distributed import DistributedSampler, T_co
+from torch.utils.data.distributed import DistributedSampler
 
 
 class MyDistributedSampler(DistributedSampler[T_co]):
