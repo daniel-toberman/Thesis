@@ -57,7 +57,7 @@ class MyDataModule(LightningDataModule):
         return DataLoader(dataset_train,sampler=MyDistributedSampler(dataset=dataset_train,seed=2,shuffle=True), batch_size=self.batch_size[0], num_workers=self.num_workers)
 
     def val_dataloader(self) -> DataLoader:
-        return DataLoader(dataset_val, sampler=MyDistributedSampler(dataset=dataset_val,seed=2,shuffle=False),batch_size=self.batch_size[1], num_workers=self.num_workers)
+        return DataLoader(dataset_val, sampler=MyDistributedSampler(dataset=dataset_val,seed=2,shuffle=False),batch_size=self.batch_size[1], num_workers=self.num_workers, persistent_workers=True)
         
     def test_dataloader(self) -> DataLoader:
         return DataLoader(dataset_test, sampler=MyDistributedSampler(dataset=dataset_test,seed=2,shuffle=False),batch_size=self.batch_size[1], num_workers=self.num_workers)
@@ -277,6 +277,14 @@ class MyCLI(LightningCLI):
         parser.add_lightning_class_args(
             RichProgressBar, nested_key='progress_bar')
         parser.set_defaults({
+            "progress_bar.theme.description": "bold cyan",
+            "progress_bar.theme.progress_bar": "green",
+            "progress_bar.theme.progress_bar_finished": "green",
+            "progress_bar.theme.progress_bar_pulse": "cyan",
+            "progress_bar.theme.batch_progress": "green",
+            "progress_bar.theme.time": "grey82",
+            "progress_bar.theme.processing_speed": "grey82",
+            "progress_bar.theme.metrics": "grey82",
             "progress_bar.console_kwargs": {
                 "force_terminal": True,
                 "no_color": True,  

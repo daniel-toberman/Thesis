@@ -1,18 +1,18 @@
 import numpy as np
 
-from .xsrp import XSrp
+from xsrpMain.xsrp.xsrp import XSrp
 
-from .grids import (
+from xsrpMain.xsrp.grids import (
     Grid, UniformSphericalGrid, UniformCartesianGrid
 )
-from .signal_features.cross_correlation import cross_correlation
-from .signal_features.gcc_phat import gcc_phat
+from xsrpMain.xsrp.signal_features.cross_correlation import cross_correlation
+from xsrpMain.xsrp.signal_features.gcc_phat import gcc_phat
 
-from .srp_mappers import (
+from xsrpMain.xsrp.srp_mappers import (
     temporal_projector,
     frequency_projector
 )
-from .grid_search import (
+from xsrpMain.xsrp.grid_search import (
     argmax_grid_searcher
 )
 

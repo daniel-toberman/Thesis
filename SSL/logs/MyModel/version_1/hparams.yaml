@@ -1,0 +1,13 @@
+_instantiator: pytorch_lightning.cli.instantiate_module
+compile: false
+device: cuda
+exp_name: exp
+fs: 16000
+max_num_sources: 1
+nfft: 512
+res_phi: 360
+res_the: 1
+return_metric: true
+tar_useVAD: true
+win_len: 512
+win_shift_ratio: 0.625
