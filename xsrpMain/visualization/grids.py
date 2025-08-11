@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from xsrp.grids import UniformSphericalGrid
+from xsrpMain.xsrp.grids import UniformSphericalGrid
 
 
 def plot_uniform_cartesian_grid(

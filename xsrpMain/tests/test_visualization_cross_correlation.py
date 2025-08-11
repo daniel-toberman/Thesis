@@ -4,11 +4,11 @@ import os
 import pyroomacoustics as pra
 import soundfile as sf
 
-from visualization.cross_correlation import (
+from xsrpMain.visualization.cross_correlation import (
     plot_cross_correlation,
 )
 
-from xsrp.signal_features.cross_correlation import cross_correlation
+from xsrpMain.xsrp.signal_features.cross_correlation import cross_correlation
 
 
 def test_visualize_cross_correlation_matrix():

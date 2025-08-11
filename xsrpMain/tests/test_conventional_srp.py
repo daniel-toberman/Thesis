@@ -2,9 +2,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pyroomacoustics as pra
-
-from visualization.grids import plot_uniform_cartesian_grid
-from xsrp.conventional_srp import ConventionalSrp
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+from xsrpMain.visualization.grids import plot_uniform_cartesian_grid
+from xsrpMain.xsrp.conventional_srp import ConventionalSrp
 
 
 def test_compare_averaging():
@@ -146,3 +147,6 @@ def _simulate():
     signals = room.mic_array.signals
 
     return fs, room_dims, mic_positions, source_position, signals
+
+if __name__ == "__main__":
+    test_compare_averaging()

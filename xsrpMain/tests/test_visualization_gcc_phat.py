@@ -3,12 +3,12 @@ import numpy as np
 import os
 import soundfile as sf
 
-from visualization.cross_correlation import (
+from xsrpMain.visualization.cross_correlation import (
     plot_cross_correlation
 )
-from xsrp.signal_features.cross_correlation import cross_correlation
+from xsrpMain.xsrp.signal_features.cross_correlation import cross_correlation
 
-from xsrp.signal_features.gcc_phat import gcc_phat
+from xsrpMain.xsrp.signal_features.gcc_phat import gcc_phat
 
 
 def test_visualize_gcc_phat_time():

@@ -2,7 +2,7 @@ import numpy as np
 
 from abc import ABC, abstractmethod
 
-from xsrp.grids import Grid
+from xsrpMain.xsrp.grids import Grid
 
 
 class XSrp(ABC):

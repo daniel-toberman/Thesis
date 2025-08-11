@@ -1,13 +1,13 @@
 import numpy as np
 import os
 
-from visualization.spatial_mappers import (
+from xsrpMain.visualization.spatial_mappers import (
     plot_pairwise_mapper,
 )
-from xsrp.grids import (
+from xsrpMain.xsrp.grids import (
     UniformCartesianGrid,
 )
-from xsrp.spatial_mappers import (
+from xsrpMain.xsrp.spatial_mappers import (
     tdoa_mapper,
     integer_sample_mapper,
     fractional_sample_mapper

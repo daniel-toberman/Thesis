@@ -4,12 +4,12 @@ import os
 import pyroomacoustics as pra
 import soundfile as sf
 
-from visualization.grids import (
+from xsrpMain.visualization.grids import (
     plot_azimuth_elevation_grid, plot_uniform_cartesian_grid,
     plot_azimuth_elevation_heatmap
 
 )
-from xsrp.conventional_srp import ConventionalSrp
+from xsrpMain.xsrp.conventional_srp import ConventionalSrp
 
 
 # def test_doa_2d():
@@ -315,3 +315,6 @@ def generate_random_scenario(mode="2d", interferer=False):
             interferer_position_norm,
             interferer_position
         )
+
+if __name__ == "__main__":
+    test_doa_3d_clean()

@@ -2,11 +2,11 @@ import numpy as np
 import os
 import pyroomacoustics as pra
 
-from visualization.grids import (
+from xsrpMain.visualization.grids import (
     plot_uniform_cartesian_grid,
     #plot_uniform_angular_grid
 )
-from xsrp.grids import (
+from xsrpMain.xsrp.grids import (
     UniformCartesianGrid,
     UniformSphericalGrid
 )
