@@ -54,7 +54,7 @@ class MyDataModule(LightningDataModule):
         return super().prepare_data()
 
     def train_dataloader(self) -> DataLoader:
-        return DataLoader(dataset_train,sampler=MyDistributedSampler(dataset=dataset_train,seed=2,shuffle=True), batch_size=self.batch_size[0], num_workers=self.num_workers)
+        return DataLoader(dataset_train,sampler=MyDistributedSampler(dataset=dataset_train,seed=2,shuffle=True), batch_size=self.batch_size[0], num_workers=self.num_workers, persistent_workers=True)
 
     def val_dataloader(self) -> DataLoader:
         return DataLoader(dataset_val, sampler=MyDistributedSampler(dataset=dataset_val,seed=2,shuffle=False),batch_size=self.batch_size[1], num_workers=self.num_workers, persistent_workers=True)

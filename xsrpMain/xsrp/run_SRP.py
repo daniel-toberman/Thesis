@@ -8,75 +8,54 @@ import numpy as np
 import pandas as pd
 import soundfile as sf
 import matplotlib.pyplot as plt
+import re
 
 from SSL.utils_ import audiowu_high_array_geometry
 
 # === CONFIG (defaults; can override with CLI) ===
-BASE_DIR = r"E:\RealMAN\test\ma_noisy_speech"
+# === CONFIG (defaults; can override with CLI) ===
+BASE_DIR = r"E:\RealMAN\extracted\test\ma_noisy_speech"
 CSV_PATH = r"E:\RealMAN\test\test_static_source_location.csv"
-SEVEN_ZIP = r"C:\Program Files\7-Zip\7z.exe"
-TMP_EXTRACT = r"E:\RealMAN\_tmp_extract"
 
-MIC_POSITIONS = audiowu_high_array_geometry()
+USE_MIC_ID = [1, 2, 3, 4, 5, 6, 7, 8, 0]
+MIC_POSITIONS = audiowu_high_array_geometry()[USE_MIC_ID, :2]
 SRP_GRID_CELLS = 360
 SRP_MODE = "gcc_phat_time"   # or "gcc_phat_freq"
 N_AVG_SAMPLES = 3
 N_DFT_BINS = 2048
 
 # Local imports
-try:
-    from conventional_srp import ConventionalSrp
-except ImportError:
-    sys.path.append(str(Path(__file__).parent))
-    from conventional_srp import ConventionalSrp
+from xsrpMain.xsrp.conventional_srp import ConventionalSrp
 
 # Visualization + signal features (avoid name clash)
-try:
-    from gcc_phat import gcc_phat
-    from cross_correlation import cross_correlation as cc_raw
-    from cross_correlation import plot_cross_correlation as plot_cc  # viz util
-except ImportError:
-    gcc_phat = None
-    plot_cc = None
-    cc_raw = None
+from xsrpMain.xsrp.signal_features.gcc_phat import gcc_phat
+from xsrpMain.xsrp.signal_features import cross_correlation as cc_raw
+from xsrpMain.visualization.cross_correlation import plot_cross_correlation as plot_cc  # viz util
 
 
-def ensure_flac_available(rel_flac: str) -> Path | None:
-    abs_path = Path(BASE_DIR) / rel_flac
-    if abs_path.exists():
-        return abs_path
-    if not SEVEN_ZIP or not Path(SEVEN_ZIP).exists():
-        print(f"[WARN] {abs_path} not found and 7z.exe not configured. Skipping.")
-        return None
-    archive = os.path.join(BASE_DIR,rel_flac.split('/')[0] + '.rar')
-    if not archive:
-        print(f"[WARN] No .rar found for {rel_flac}.")
-        return None
-    dest = Path(TMP_EXTRACT)
-    dest.mkdir(parents=True, exist_ok=True)
-    inner_path = '/'.join(rel_flac.split('/')[0:])
-    inner_path = inner_path.split('.')[0] + '*' + '.flac'
-    cmd = [SEVEN_ZIP, "x", "-y", f"-o{dest}", str(archive), inner_path.replace("/", "\\")]
-    res = subprocess.run(cmd, capture_output=True, text=True)
-    if res.returncode != 0:
-        print(f"[ERROR] 7z failed for {rel_flac}:\n{res.stderr}")
-        return None
-    if dest.exists():
-        return dest
-    cmd2 = [SEVEN_ZIP, "x", "-y", f"-o{dest.parent}", str(archive)]
-    res2 = subprocess.run(cmd2, capture_output=True, text=True)
-    if res2.returncode != 0:
-        print(f"[ERROR] 7z full extract failed:\n{res2.stderr}")
-        return None
-    if dest.exists():
-        return dest
-    found = list(dest.parent.rglob(Path(rel_flac).name))
-    return found[0] if found else None
 
-def load_segment_multichannel(flac_path: Path, st: int, ed: int):
-    x, fs = sf.read(str(flac_path), always_2d=True)
-    ed = min(ed, len(x))
-    return fs, x[st:ed, :].T.astype(np.float64)
+USE_MIC_ID = [1, 2, 3, 4, 5, 6, 7, 8, 0]
+
+def load_segment_multichannel(flac_ch1_path: Path, st: int, ed: int, use_mic_id=USE_MIC_ID):
+    """
+    Loads a multichannel segment from files named ..._CH{N}.flac.
+    Accepts either a base path ending with .flac or a CH1 path like *_CH1.flac.
+    Returns: fs (int), X with shape (channels, samples) as float64.
+    """
+    p = str(flac_ch1_path)
+    channels = []
+    for i in use_mic_id:
+        temp_path = p.replace('.flac', f'_CH{i}.flac')
+        if i == 0:
+            info = sf.info(temp_path)
+            fs_ref = info.samplerate
+        single_ch_signal, fs = sf.read(temp_path, dtype="float64")
+        channels.append(single_ch_signal)
+
+    # SRP expects (C, T)
+    X = np.stack(channels, axis=0)
+    return fs_ref, X
+
 
 def run_srp_return_details(fs: int, mic_signals: np.ndarray):
     srp = ConventionalSrp(
@@ -130,7 +109,6 @@ def plot_pairwise_cc_or_gcc(fs: int, X: np.ndarray, out: Path | None, use_gcc=Tr
 
 def process_row(row, idx, plots: bool, outdir: Path | None, save_cc: bool, save_gcc: bool):
     rel = str(row["filename"]).replace("\\", "/")
-    rel = '/'.join(rel.split('/')[2:])
     st = int(row["real_st"]); ed = int(row["real_ed"])
     gt = None
     for c in row.index:
@@ -139,11 +117,7 @@ def process_row(row, idx, plots: bool, outdir: Path | None, save_cc: bool, save_
             except: gt = None
             break
 
-    flac_path = ensure_flac_available(rel)
-    if flac_path is None:
-        print(f"[WARN] Missing audio for {rel}")
-        return {"idx": idx, "filename": rel, "status": "missing"}
-
+    flac_path = os.path.join(BASE_DIR, rel)
     fs, X = load_segment_multichannel(flac_path, st, ed)
     if X.shape[0] != MIC_POSITIONS.shape[0]:
         return {"idx": idx, "filename": rel, "status": f"error: mic count mismatch ({X.shape[0]} vs {MIC_POSITIONS.shape[0]})"}
@@ -168,7 +142,7 @@ def process_row(row, idx, plots: bool, outdir: Path | None, save_cc: bool, save_
     }
 
 def main():
-    global CSV_PATH, BASE_DIR, SEVEN_ZIP
+    global CSV_PATH, BASE_DIR
     p = argparse.ArgumentParser()
     p.add_argument("--csv", default=CSV_PATH)
     p.add_argument("--base-dir", default=BASE_DIR)
@@ -176,14 +150,16 @@ def main():
     p.add_argument("--idx", type=int, default=None, help="Row index to run (overrides --first-only)")
     p.add_argument("--plots", action="store_true", help="Enable verification plots")
     p.add_argument("--outdir", default=None, help="Where to save plots (if omitted, show on screen)")
-    p.add_argument("--no-extract", action="store_true")
     p.add_argument("--save_cc", action="store_true", help="Also plot plain cross-correlation per pair")
     p.add_argument("--save_gcc", action="store_true", help="Also plot GCC-PHAT per pair")
+    p.add_argument("--n", type=int, default=None, help="Number of rows to run")
+    p.add_argument("--random", action="store_true", help="Pick rows at random")
+    p.add_argument("--seed", type=int, default=0, help="RNG seed for --random")
+
     args = p.parse_args()
 
 
     CSV_PATH = args.csv; BASE_DIR = args.base_dir
-    if args.no_extract: SEVEN_ZIP = None
     outdir = Path(args.outdir) if args.outdir else None
 
     df = pd.read_csv(CSV_PATH)
@@ -197,7 +173,14 @@ def main():
     elif args.first_only:
         rows = [(0, df.iloc[0])]
     else:
-        rows = list(df.iterrows())
+        if args.n is not None and args.random:
+            rng = np.random.default_rng(args.seed)
+            idxs = rng.choice(df.index.values, size=min(args.n, len(df)), replace=False)
+            rows = [(int(i), df.loc[int(i)]) for i in idxs]
+        elif args.n is not None:
+            rows = list(df.iloc[:args.n].iterrows())
+        else:
+            rows = list(df.iterrows())
 
     results = []
     for idx, row in rows:

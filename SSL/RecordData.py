@@ -158,7 +158,7 @@ class RealData(Dataset):
                 mic_signal = self.resample(mic_signal=mic_signal, fs=fs, new_fs=self.target_fs)
             len_signal = mic_signal.shape[0] / self.target_fs
             # pading or cut the source signal
-            if len_signal < 5:
+            if len_signal < self.wav_use_len:
                 input_length = int(self.wav_use_len * self.target_fs)
                 input_mic_signal = np.zeros((input_length, mic_signal.shape[1]))
                 min_length = min(input_length, mic_signal.shape[0])
@@ -166,7 +166,7 @@ class RealData(Dataset):
                 dp_vad_temp = self.cal_vad(dp_signal)
                 if dp_vad_temp.shape[0] > 40:
                     dp_vad_temp = dp_vad_temp[:40, :]
-                target = self.all_targets.at[sig_path.split('RealMAN/')[-1], 'angle(°)']
+                target = self.all_targets.at[sig_path.split('RealMAN/extracted/')[-1], 'angle(°)']
                 if isinstance(target, float):
                     targets = torch.ones((self.target_len, 1)) * int(target)
                     vad_source = torch.zeros((self.target_len, 1))
@@ -191,7 +191,7 @@ class RealData(Dataset):
                 input_mic_signal, signal_start, input_dp_signal = self.seg_signal(signal=mic_signal, fs=self.target_fs,
                     dp_signal=dp_signal, rng=rng)
                 dp_vad = self.cal_vad(input_dp_signal)
-                target = self.all_targets.at[sig_path.split('RealMAN/')[-1], 'angle(°)']
+                target = self.all_targets.at[sig_path.split('RealMAN/extracted/')[-1], 'angle(°)']
                 if isinstance(target, float):
                     targets = torch.ones((self.target_len, 1)) * int(target)
                     vad_source = torch.ones((self.target_len, 1))
@@ -205,53 +205,128 @@ class RealData(Dataset):
                     print(sig_path, target)
             # add noise following the SNR
 
+            # add noise following the SNR
             noise_path = self.noise_paths[rng.integers(low=0, high=len(self.noise_paths))]
+
             wav_info = sf.info(noise_path)
-            wav_frames = wav_info.frames
-            noise_begin_index = rng.integers(low=0, high=wav_frames - (self.wav_use_len * self.input_fs))
-            noise_end_index = noise_begin_index + (self.wav_use_len * self.input_fs)
-            noise_signal, noise_fs = self.load_noise(noise_path, begin_index=noise_begin_index,
-                end_index=noise_end_index, use_mic_id=use_mic_id_item)
+            noise_sr = wav_info.samplerate
+            window_frames = int(self.wav_use_len * noise_sr)  # 4s in noise file's frames
+            start_max = max(0, wav_info.frames - window_frames)
+            noise_begin_index = int(rng.integers(low=0, high=start_max + 1))
+            noise_end_index = noise_begin_index + window_frames
+
+            noise_signal, noise_fs = self.load_noise(
+                noise_path,
+                begin_index=noise_begin_index,
+                end_index=noise_end_index,
+                use_mic_id=use_mic_id_item
+                )
+
+            # resample if needed
             if noise_fs != self.target_fs:
                 noise_signal = self.resample(noise_signal, noise_fs, self.target_fs)
+
+            # enforce exact length (match input_mic_signal = 4s@target_fs)
+            target_len_samples = int(self.wav_use_len * self.target_fs)
+            n = noise_signal.shape[0]
+            if n < target_len_samples:
+                pad = np.zeros((target_len_samples - n, noise_signal.shape[1]), dtype=noise_signal.dtype)
+                noise_signal = np.vstack([noise_signal, pad])
+            elif n > target_len_samples:
+                noise_signal = noise_signal[:target_len_samples, :]
+
             coeff = self.get_snr_coff(input_mic_signal, noise_signal, snr_item)
-            try:
-                assert coeff is not None
-            except:
+            if coeff is None:
                 coeff = 1.0
             noise_signal = coeff * noise_signal
             input_mic_signal += noise_signal
+
             # sf.write('./sample/' + str(idx)+'.wav',new_mic_signal,self.new_fs)
             # print(new_mic_signal.shape,labels.to(torch.float32).shape,vad_source.to(torch.float32).shape)
             array_topo = self.pos_mics[use_mic_id_item]
             # print(dp_vad)
             return input_mic_signal, targets.to(torch.float32), dp_vad.to(torch.float32), array_topo
 
+
         else:
-            # sig_path = self.data_paths[idx]
+            # Validation/Test: mimic train logic (fixed first 4s window), no noise
+
+            if self.is_varibale_array:
+                use_mic_id_item, _ = self.select_mic_array_no_circle(self.pos_mics, rng=rng)
+
+            else:
+                use_mic_id_item = self.use_mic_id
+
             dp_sig_path = sig_path.replace('/ma_noisy_speech/', '/dp_speech/')
+
             dp_signal, dp_fs = sf.read(dp_sig_path)
+
             if dp_fs != self.target_fs:
                 dp_signal = self.resample(mic_signal=dp_signal, fs=dp_fs, new_fs=self.target_fs)
-            dp_vad = self.cal_vad(dp_signal)
 
-            input_mic_signal, fs = self.load_signals(sig_path, use_mic_id=self.use_mic_id)
+            mic_signal, fs = self.load_signals(sig_path, use_mic_id=use_mic_id_item)
+
             if fs != self.target_fs:
-                input_mic_signal = self.resample(mic_signal=input_mic_signal, fs=fs, new_fs=self.target_fs)
-            len_signal = input_mic_signal.shape[0] / self.target_fs
-            num_points = int(len_signal * 10)
+                mic_signal = self.resample(mic_signal=mic_signal, fs=fs, new_fs=self.target_fs)
+
+            len_signal = mic_signal.shape[0] / self.target_fs
+
+            if len_signal < self.wav_use_len:
+                input_length = int(self.wav_use_len * self.target_fs)
+
+                input_mic_signal = np.zeros((input_length, mic_signal.shape[1]))
+
+                min_length = min(input_length, mic_signal.shape[0])
+
+                input_mic_signal[:min_length, :] = mic_signal[:min_length, :]
+
+                dp_vad = self.cal_vad(dp_signal)
+
+            else:
+                input_mic_signal, signal_start, input_dp_signal = self.seg_signal(
+
+                    signal=mic_signal, fs=self.target_fs, dp_signal=dp_signal, rng=rng
+
+                    )
+
+                dp_vad = self.cal_vad(input_dp_signal)
+
+            # ---- FIX LENGTHS TO self.target_len (e.g., 40 frames) ----
+
+            num_points = int(self.target_len)
+
+            # targets
+
             target = self.all_targets.at[sig_path.split('RealMAN/extracted/')[-1], 'angle(°)']
+
             if isinstance(target, float):
                 targets = torch.ones((num_points, 1)) * int(target)
+
             elif isinstance(target, str):
-                targets = np.array([int(float(i)) for i in target.split(',')])
-                targets = torch.from_numpy(targets[:, np.newaxis])
-            vad_source = torch.ones((targets.shape[0], 1))
-            array_topo = self.pos_mics[self.use_mic_id]
-            if vad_source.shape[0] > dp_vad.shape[0]:
-                vad_source[:dp_vad.shape[0], :] = dp_vad[:, :]
+                arr = np.array([int(float(i)) for i in target.split(',')], dtype=np.int64)
+
+                if arr.shape[0] >= num_points:
+                    targets = torch.from_numpy(arr[:num_points, None])
+
+                else:
+                    pad_val = arr[-1] if arr.size else 0
+
+                    pad = np.full((num_points - arr.shape[0],), pad_val, dtype=np.int64)
+
+                    targets = torch.from_numpy(np.concatenate([arr, pad])[:, None])
+
+            # VAD
+
+            if dp_vad.shape[0] >= num_points:
+                dp_vad = dp_vad[:num_points, :]
+
             else:
-                vad_source = dp_vad[:vad_source.shape[0], :]
+                pad = torch.ones((num_points - dp_vad.shape[0], 1), dtype=dp_vad.dtype)
 
+                dp_vad = torch.cat([dp_vad, pad], dim=0)
 
-            return input_mic_signal, targets.to(torch.float32), vad_source.to(torch.float32), array_topo
+            # ---- END FIX ----
+
+            array_topo = self.pos_mics[use_mic_id_item]
+
+            return input_mic_signal, targets.to(torch.float32), dp_vad.to(torch.float32), array_topo
