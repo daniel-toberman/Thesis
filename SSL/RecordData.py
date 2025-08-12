@@ -13,7 +13,7 @@ from pathlib import Path
 class RealData(Dataset):
     def __init__(self, data_dir, target_dir, noise_dir, input_fs=16000, use_mic_id=[1, 2, 3, 4, 5, 6, 7, 8, 0],
             target_fs=16000, snr=[-10, 15], wav_use_len=4, on_the_fly=True, is_variable_array=False):
-        self.ends = 'CH1.flac'
+        self.ends = 'CH1.wav'
         self.data_paths = []
         self.all_targets = pd.DataFrame()
         for dir in target_dir:
@@ -28,7 +28,7 @@ class RealData(Dataset):
         self.wav_use_len = 4
         self.target_len = self.wav_use_len * 10
         self.pos_mics = audiowu_high_array_geometry()
-        # get all noise file path (ends with CH1.flac)
+        # get all noise file path (ends with CH1.wav)
         if on_the_fly:
             self.noise_paths = search_files(noise_dir, flag=self.ends)
         self.is_varibale_array = is_variable_array
@@ -102,8 +102,8 @@ class RealData(Dataset):
     def load_signals(self, sig_path, use_mic_id):
         channels = []
         for i in use_mic_id:
-            temp_path = sig_path.replace('.flac', f'_CH{i}.flac')
-            single_ch_signal, fs = sf.read(temp_path)
+            temp_path = sig_path.replace('.flac', f'_CH{i}.wav')
+            single_ch_signal, fs = sf.read(temp_path, dtype="float32")
             channels.append(single_ch_signal)
         mul_ch_signals = np.stack(channels, axis=-1)
 
@@ -113,9 +113,9 @@ class RealData(Dataset):
         channels = []
 
         for i in use_mic_id:
-            temp_path = noise_path.replace('_CH1.flac', f'_CH{i}.flac')
+            temp_path = noise_path.replace('_CH1.flac', f'_CH{i}.wav')
             try:
-                single_ch_signal, fs = sf.read(temp_path, start=begin_index, stop=end_index)
+                single_ch_signal, fs = sf.wav(temp_path, start=begin_index, stop=end_index, dtype="float32")
             except:
                 print(temp_path, begin_index, end_index)
             channels.append(single_ch_signal)
@@ -146,7 +146,8 @@ class RealData(Dataset):
                 use_mic_id_item = self.use_mic_id
             # cal vad
             dp_sig_path = sig_path.replace('/ma_speech/', '/dp_speech/')
-            dp_signal, dp_fs = sf.read(dp_sig_path)
+            dp_sig_path = dp_sig_path.replace('.flac', '.wav')
+            dp_signal, dp_fs = sf.read(dp_sig_path, dtype="float32")
             if dp_fs != self.target_fs:
                 dp_signal = self.resample(mic_signal=dp_signal, fs=dp_fs, new_fs=self.target_fs)
             # print(dp_signal.shape)
@@ -258,8 +259,8 @@ class RealData(Dataset):
                 use_mic_id_item = self.use_mic_id
 
             dp_sig_path = sig_path.replace('/ma_noisy_speech/', '/dp_speech/')
-
-            dp_signal, dp_fs = sf.read(dp_sig_path)
+            dp_sig_path = dp_sig_path.replace('.flac', '.wav')
+            dp_signal, dp_fs = sf.read(dp_sig_path, dtype="float32")
 
             if dp_fs != self.target_fs:
                 dp_signal = self.resample(mic_signal=dp_signal, fs=dp_fs, new_fs=self.target_fs)
