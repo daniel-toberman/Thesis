@@ -235,13 +235,12 @@ class RealData(Dataset):
                 dp_signal = self.resample(mic_signal=dp_signal, fs=dp_fs, new_fs=self.target_fs)
             dp_vad = self.cal_vad(dp_signal)
 
-            load_path = sig_path.replace('ma_noisy_speech', 'ma_speech')
-            input_mic_signal, fs = self.load_signals(load_path, use_mic_id=self.use_mic_id)
+            input_mic_signal, fs = self.load_signals(sig_path, use_mic_id=self.use_mic_id)
             if fs != self.target_fs:
                 input_mic_signal = self.resample(mic_signal=input_mic_signal, fs=fs, new_fs=self.target_fs)
             len_signal = input_mic_signal.shape[0] / self.target_fs
             num_points = int(len_signal * 10)
-            target = self.all_targets.at[sig_path.split('RealMAN/')[-1], 'angle(°)']
+            target = self.all_targets.at[sig_path.split('RealMAN/extracted/')[-1], 'angle(°)']
             if isinstance(target, float):
                 targets = torch.ones((num_points, 1)) * int(target)
             elif isinstance(target, str):
@@ -253,4 +252,6 @@ class RealData(Dataset):
                 vad_source[:dp_vad.shape[0], :] = dp_vad[:, :]
             else:
                 vad_source = dp_vad[:vad_source.shape[0], :]
+
+
             return input_mic_signal, targets.to(torch.float32), vad_source.to(torch.float32), array_topo

@@ -11,3 +11,14 @@ matplotlib
 pandas
 
 pip install -r requirements.txt
+
+
+
+extract rar
+powershell:
+Get-ChildItem -Path "E:\RealMAN" -Recurse -Filter *.rar | ForEach-Object {
+    $relativePath = $_.DirectoryName.Substring("E:\RealMAN".Length).TrimStart('\')
+    $outputDir = Join-Path "E:\RealMAN\extracted" $relativePath
+    New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+	& "C:\Program Files\7-Zip\7z.exe" x $_.FullName -o"$outputDir" -aos
+}
