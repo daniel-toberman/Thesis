@@ -22,3 +22,17 @@ Get-ChildItem -Path "E:\RealMAN" -Recurse -Filter *.rar | ForEach-Object {
     New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 	& "C:\Program Files\7-Zip\7z.exe" x $_.FullName -o"$outputDir" -aos
 }
+
+
+
+profiler (check runn time bottlenecks)
+fit
+--trainer.devices=1
+--trainer.accelerator=gpu
+--trainer.precision=16-mixed
+--trainer.strategy=auto
+--trainer.max_epochs=1
+--trainer.profiler=simple
+--trainer.limit_train_batches=20
+--trainer.limit_val_batches=4
+--trainer.log_every_n_steps=1

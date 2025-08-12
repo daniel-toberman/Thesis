@@ -25,27 +25,23 @@ torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 # torch.set_float32_matmul_precision('medium')
 
+dataset_train = RealData(data_dir='D:/RealMAN/extracted/',
+                target_dir=['D:/RealMAN/train/train_static_source_location.csv'],
+                noise_dir='D:/RealMAN/extracted/train/ma_noise/')
 
-#opts = opt()
-#dirs = opts.dir()
-
-dataset_train = RealData(data_dir='E:/RealMAN/extracted/',
-                target_dir=['E:/RealMAN/train/train_static_source_location.csv'],
-                noise_dir='E:/RealMAN/extracted/train/ma_noise/')
-
-dataset_val = RealData(data_dir='E:/RealMAN/extracted/',
-                target_dir=['E:/RealMAN/val/val_static_source_location.csv'],
-                noise_dir='E:/RealMAN/extracted/val/ma_noise/',
+dataset_val = RealData(data_dir='D:/RealMAN/extracted/',
+                target_dir=['D:/RealMAN/val/val_static_source_location.csv'],
+                noise_dir='D:/RealMAN/extracted/val/ma_noise/',
                 on_the_fly=False)
 
-dataset_test = RealData(data_dir='E:/RealMAN/extracted/',
-                target_dir=['E:/RealMAN/test/test_static_source_location.csv'],
-                noise_dir='E:/RealMAN/extracted/test/ma_noise/',
+dataset_test = RealData(data_dir='D:/RealMAN/extracted/',
+                target_dir=['D:/RealMAN/test/test_static_source_location.csv'],
+                noise_dir='D:/RealMAN/extracted/test/ma_noise/',
                 on_the_fly=False)
 
 class MyDataModule(LightningDataModule):
 
-    def __init__(self, num_workers: int = 5, batch_size: Tuple[int, int] = (16, 16)):
+    def __init__(self, num_workers: int = 5, batch_size: Tuple[int, int] = (32, 64)):
         super().__init__()
         self.num_workers = num_workers
         self.batch_size = batch_size
@@ -54,14 +50,37 @@ class MyDataModule(LightningDataModule):
         return super().prepare_data()
 
     def train_dataloader(self) -> DataLoader:
-        return DataLoader(dataset_train,sampler=MyDistributedSampler(dataset=dataset_train,seed=2,shuffle=True), batch_size=self.batch_size[0], num_workers=self.num_workers, persistent_workers=True)
+        return DataLoader(
+            dataset_train,
+            sampler=MyDistributedSampler(dataset=dataset_train, seed=2, shuffle=True),
+            batch_size=self.batch_size[0],
+            num_workers=self.num_workers,
+            pin_memory=True,
+            persistent_workers=True,
+            prefetch_factor=2,  # needs num_workers > 0
+            )
 
     def val_dataloader(self) -> DataLoader:
-        return DataLoader(dataset_val, sampler=MyDistributedSampler(dataset=dataset_val,seed=2,shuffle=False),batch_size=self.batch_size[1], num_workers=self.num_workers, persistent_workers=True)
-        
+        return DataLoader(
+            dataset_val,
+            sampler=MyDistributedSampler(dataset=dataset_val, seed=2, shuffle=True),
+            batch_size=self.batch_size[0],
+            num_workers=self.num_workers,
+            pin_memory=True,
+            persistent_workers=True,
+            prefetch_factor=2,  # needs num_workers > 0
+            )
+
     def test_dataloader(self) -> DataLoader:
-        return DataLoader(dataset_test, sampler=MyDistributedSampler(dataset=dataset_test,seed=2,shuffle=False),batch_size=self.batch_size[1], num_workers=self.num_workers)
-        #return DataLoader(dataset_test,batch_size=self.batch_size[1], num_workers=self.num_workers)
+        return DataLoader(
+            dataset_test,
+            sampler=MyDistributedSampler(dataset=dataset_test, seed=2, shuffle=False),
+            batch_size=self.batch_size[1],
+            num_workers=self.num_workers,
+            pin_memory=True,
+            persistent_workers=True,
+            prefetch_factor=2,
+            )
 
 class MyModel(LightningModule):
 
@@ -216,7 +235,7 @@ class MyModel(LightningModule):
     def data_preprocess(self, mic_sig_batch=None, targets_batch=None, eps=1e-6):
         data = []
         if mic_sig_batch is not None:
-            mic_sig_batch = mic_sig_batch              
+            mic_sig_batch = mic_sig_batch.to(self.dev, non_blocking=True)
             stft = self.dostft(signal=mic_sig_batch)
             nb,nf,nt,nc = stft.shape
             stft = stft.permute(0, 3, 1, 2)
