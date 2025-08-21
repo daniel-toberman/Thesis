@@ -1,0 +1,6 @@
+jsonargparse
+pytorch-lightning
+numpy
+scipy
+matplotlib
+pandas
