@@ -49,6 +49,30 @@ class CRNN(nn.Module):
         self.ipd2xyz2 = nn.Linear(256, 360)
         self.sigmoid = nn.Sigmoid()
 
+    # --- in CRNN.py (inside class CRNN) ---
+    def forward_with_intermediates(self, x):
+        """
+        Returns:
+          logits_pre_sig  : [B, T, 360]  (pre-sigmoid)
+          penult_features : [B, T, 256]  (output of ReLU(ipd2xyz))
+        """
+        fea = x
+        nb, _, nf, nt = fea.shape
+        fea_cnn = self.cnn(fea)
+        fea_rnn_in = fea_cnn.view(nb, -1, fea_cnn.size(3))
+        fea_rnn_in = fea_rnn_in.permute(0, 2, 1)
+
+        fea_rnn, _ = self.rnn(fea_rnn_in)
+        fea_rnn_fc = self.rnn_fc(fea_rnn)
+        penult = self.relu(self.ipd2xyz(fea_rnn_fc))  # [B,T,256]
+        logits_pre_sig = self.ipd2xyz2(penult)  # [B,T,360]
+        return logits_pre_sig, penult  # no sigmoid here!
+
+    # (your existing forward stays the same)
+    def forward(self, x):
+        logits_pre_sig, _ = self.forward_with_intermediates(x)
+        return self.sigmoid(logits_pre_sig)
+
     def forward(self, x):
         fea = x
         nb, _, nf, nt = fea.shape  # (55,4,256,1249)
