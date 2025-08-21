@@ -14,8 +14,8 @@ from SSL.utils_ import audiowu_high_array_geometry
 
 # === CONFIG (defaults; can override with CLI) ===
 # === CONFIG (defaults; can override with CLI) ===
-BASE_DIR = r"E:\RealMAN\extracted\test\ma_noisy_speech"
-CSV_PATH = r"E:\RealMAN\test\test_static_source_location.csv"
+BASE_DIR = r"D:\RealMAN\extracted\test\ma_noisy_speech"
+CSV_PATH = r"D:\RealMAN\test\test_static_source_location.csv"
 
 USE_MIC_ID = [1, 2, 3, 4, 5, 6, 7, 8, 0]
 MIC_POSITIONS = audiowu_high_array_geometry()[USE_MIC_ID, :2]

@@ -29,25 +29,21 @@ torch.backends.cudnn.allow_tf32 = True
 #opts = opt()
 #dirs = opts.dir()
 
-dataset_train = RealData(data_dir='/data/home/RealisticAudio/RealMAN/',
-                target_dir=['/data/home/RealisticAudio/RealMAN/train/train_static_source_location.csv',
-                            '/data/home/RealisticAudio/RealMAN/train/train_moving_source_location.csv'],
-                noise_dir='/data/home/RealisticAudio/RealMAN/train/ma_noise/',
+dataset_train = RealData(data_dir='D:/RealMAN/extracted/',
+                target_dir=['D:/RealMAN/train/train_static_source_location.csv'],
+                noise_dir='D:/RealMAN/extracted/train/ma_noise/',
                 use_mic_id=[1,3,5,7,0],
                 )
 
-dataset_val = RealData(data_dir='/data/home/RealisticAudio/RealMAN/',
-                target_dir=['/data/home/RealisticAudio/RealMAN/val/val_static_source_location.csv',
-                            '/data/home/RealisticAudio/RealMAN/val/val_moving_source_location.csv'],
-                noise_dir='/data/home/RealisticAudio/RealMAN/val/ma_noise/',
+dataset_val = RealData(data_dir='D:/RealMAN/extracted/',
+                target_dir=['D:/RealMAN/val/val_static_source_location.csv'],
+                noise_dir='D:/RealMAN/extracted/val/ma_noise/',
                 use_mic_id=[1,3,5,7,0],
                 on_the_fly=False)
 
-dataset_test = RealData(data_dir='/data/home/RealisticAudio/RealMAN/',
-                target_dir=['/data/home/RealisticAudio/RealMAN/test/test_static_source_location.csv',
-                            #'/data/home/RealisticAudio/RealMAN/test/test_moving_source_location.csv'
-                            ],
-                noise_dir='/data/home/RealisticAudio/RealMAN/test/ma_noise/',
+dataset_test = RealData(data_dir='D:/RealMAN/extracted/',
+                target_dir=['D:/RealMAN/test/test_static_source_location.csv'],
+                noise_dir='D:/RealMAN/extracted/test/ma_noise/',
                 use_mic_id=[1,3,5,7,0],
                 on_the_fly=False)
 
@@ -326,11 +322,11 @@ class MyCLI(LightningCLI):
 
         parser.add_lightning_class_args(ModelCheckpoint, "model_checkpoint")
         model_checkpoint_defaults = {
-            "model_checkpoint.filename": "epoch{epoch}_valid_loss{valid/loss:.4f}",
+            "model_checkpoint.filename": "best_valid_loss{valid/loss:.4f}",
             "model_checkpoint.monitor": "valid/loss",
             "model_checkpoint.mode": "min",
             "model_checkpoint.every_n_epochs": 1,
-            "model_checkpoint.save_top_k": 100,
+            "model_checkpoint.save_top_k": 1,
             "model_checkpoint.auto_insert_metric_name": False,
             "model_checkpoint.save_last": True
         }
@@ -340,12 +336,20 @@ class MyCLI(LightningCLI):
         parser.add_lightning_class_args(
             RichProgressBar, nested_key='progress_bar')
         parser.set_defaults({
+            "progress_bar.theme.description": "bold cyan",
+            "progress_bar.theme.progress_bar": "green",
+            "progress_bar.theme.progress_bar_finished": "green",
+            "progress_bar.theme.progress_bar_pulse": "cyan",
+            "progress_bar.theme.batch_progress": "green",
+            "progress_bar.theme.time": "grey82",
+            "progress_bar.theme.processing_speed": "grey82",
+            "progress_bar.theme.metrics": "grey82",
             "progress_bar.console_kwargs": {
                 "force_terminal": True,
-                "no_color": True,  
-                "width": 200, 
-            }
-        })
+                "no_color": True,
+                "width": 200,
+                }
+            })
 
         # LearningRateMonitor
         parser.add_lightning_class_args(

@@ -34,6 +34,8 @@ dataset_val = RealData(data_dir='D:/RealMAN/extracted/',
                 noise_dir='D:/RealMAN/extracted/val/ma_noise/',
                 on_the_fly=False)
 
+
+
 dataset_test = RealData(data_dir='D:/RealMAN/extracted/',
                 target_dir=['D:/RealMAN/test/test_static_source_location.csv'],
                 noise_dir='D:/RealMAN/extracted/test/ma_noise/',
@@ -282,11 +284,11 @@ class MyCLI(LightningCLI):
 
         parser.add_lightning_class_args(ModelCheckpoint, "model_checkpoint")
         model_checkpoint_defaults = {
-            "model_checkpoint.filename": "epoch{epoch}_valid_loss{valid/loss:.4f}",
+            "model_checkpoint.filename": "best_valid_loss{valid/loss:.4f}",
             "model_checkpoint.monitor": "valid/loss",
             "model_checkpoint.mode": "min",
             "model_checkpoint.every_n_epochs": 1,
-            "model_checkpoint.save_top_k": 100,
+            "model_checkpoint.save_top_k": 1,
             "model_checkpoint.auto_insert_metric_name": False,
             "model_checkpoint.save_last": True
         }
@@ -331,8 +333,10 @@ class MyCLI(LightningCLI):
                 save_dir=save_dir, name="", version=version, default_hp_metric=False)
         else:
             model_name = type(self.model).__name__
+            base_log_dir = r'D:\SSL_logs'  # <— put logs on D:
+            os.makedirs(base_log_dir, exist_ok=True)
             self.trainer.logger = TensorBoardLogger(
-                'logs/', name=model_name, default_hp_metric=False)
+                base_log_dir, name=model_name, default_hp_metric=False)
 
     def before_test(self):
         torch.set_num_interop_threads(5)
