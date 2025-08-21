@@ -26,18 +26,18 @@ torch.backends.cudnn.allow_tf32 = True
 # torch.set_float32_matmul_precision('medium')
 
 dataset_train = RealData(data_dir='D:/RealMAN/extracted/',
-                target_dir=['D:/RealMAN/train/train_static_source_location.csv'],
+                target_dir=['D:/RealMAN/train/train_static_source_location_08.csv'],
                 noise_dir='D:/RealMAN/extracted/train/ma_noise/')
 
 dataset_val = RealData(data_dir='D:/RealMAN/extracted/',
-                target_dir=['D:/RealMAN/val/val_static_source_location.csv'],
+                target_dir=['D:/RealMAN/val/val_static_source_location_08.csv'],
                 noise_dir='D:/RealMAN/extracted/val/ma_noise/',
                 on_the_fly=False)
 
 
 
 dataset_test = RealData(data_dir='D:/RealMAN/extracted/',
-                target_dir=['D:/RealMAN/test/test_static_source_location.csv'],
+                target_dir=['D:/RealMAN/test/test_static_source_location_08.csv'],
                 noise_dir='D:/RealMAN/extracted/test/ma_noise/',
                 on_the_fly=False)
 

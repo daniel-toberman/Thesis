@@ -101,24 +101,48 @@ class RealData(Dataset):
 
     def load_signals(self, sig_path, use_mic_id):
         channels = []
+        target_len = self.wav_use_len  # expected fixed length
+
         for i in use_mic_id:
             temp_path = sig_path.replace('.flac', f'_CH{i}.wav')
             single_ch_signal, fs = sf.read(temp_path, dtype="float32")
-            channels.append(single_ch_signal)
-        mul_ch_signals = np.stack(channels, axis=-1)
 
+            # adjust length
+            if len(single_ch_signal) > target_len:
+                single_ch_signal = single_ch_signal[:target_len]  # truncate
+            elif len(single_ch_signal) < target_len:
+                pad_width = target_len - len(single_ch_signal)
+                single_ch_signal = np.pad(single_ch_signal, (0, pad_width), mode="constant")
+
+            channels.append(single_ch_signal)
+
+        # now all channels are the same length
+        mul_ch_signals = np.stack(channels, axis=-1)
         return mul_ch_signals, fs
 
     def load_noise(self, noise_path, begin_index, end_index, use_mic_id):
         channels = []
+        target_len = end_index - begin_index  # requested slice length
 
         for i in use_mic_id:
             temp_path = noise_path.replace('_CH1.flac', f'_CH{i}.wav')
             try:
-                single_ch_signal, fs = sf.wav(temp_path, start=begin_index, stop=end_index, dtype="float32")
-            except:
-                print(temp_path, begin_index, end_index)
+                single_ch_signal, fs = sf.read(
+                    temp_path, start=begin_index, stop=end_index, dtype="float32"
+                    )
+            except Exception as e:
+                print(f"Error reading {temp_path}: {e}")
+                continue
+
+            # enforce target length
+            if len(single_ch_signal) > target_len:
+                single_ch_signal = single_ch_signal[:target_len]
+            elif len(single_ch_signal) < target_len:
+                pad_width = target_len - len(single_ch_signal)
+                single_ch_signal = np.pad(single_ch_signal, (0, pad_width), mode="constant")
+
             channels.append(single_ch_signal)
+
         mul_ch_signals = np.stack(channels, axis=-1)
         return mul_ch_signals, fs
 
