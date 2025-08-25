@@ -1,7 +1,8 @@
 #from OptSRPDNN import opt
 from torch.utils.data import DataLoader, Dataset, DistributedSampler
 import numpy as np
-#import Dataset2 as at_dataset
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import Module as at_module
 import SSL.CRNN as at_model
 from utils.my_save_config_callback import MySaveConfigCallback as SaveConfigCallback
@@ -308,7 +309,7 @@ class MyCLI(LightningCLI):
             "progress_bar.theme.metrics": "grey82",
             "progress_bar.console_kwargs": {
                 "force_terminal": True,
-                "no_color": True,  
+                "no_color": False,
                 "width": 200,  
             }
         })
