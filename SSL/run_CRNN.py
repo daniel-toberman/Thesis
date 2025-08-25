@@ -43,7 +43,7 @@ dataset_test = RealData(data_dir='D:/RealMAN/extracted/',
 
 class MyDataModule(LightningDataModule):
 
-    def __init__(self, num_workers: int = 5, batch_size: Tuple[int, int] = (32, 64)):
+    def __init__(self, num_workers: int = 5, batch_size: Tuple[int, int] = (16, 4)):
         super().__init__()
         self.num_workers = num_workers
         self.batch_size = batch_size
