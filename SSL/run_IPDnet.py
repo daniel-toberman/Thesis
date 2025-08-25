@@ -157,7 +157,7 @@ class MyModel(LightningModule):
             pred_batch = pred_batch[:,:gt_batch[0].shape[1],:,:,:]
         else:
             gt_batch[0] = gt_batch[0][:,:pred_batch.shape[1],:]
-            gt_batch[1] = gt_batch[1][:pred_batch.shape[1],:,:,:]
+            gt_batch[1] = gt_batch[1][:, :pred_batch.shape[1],:,:,:]
             gt_batch[-1] = gt_batch[-1][:,:pred_batch.shape[1],:]   
         loss = self.cal_loss(pred_batch=pred_batch, gt_batch=gt_batch)
 
@@ -180,7 +180,7 @@ class MyModel(LightningModule):
             pred_batch = pred_batch[:,:gt_batch[0].shape[1],:,:,:]
         else:
             gt_batch[0] = gt_batch[0][:,:pred_batch.shape[1],:]
-            gt_batch[1] = gt_batch[1][:pred_batch.shape[1],:,:,:]
+            gt_batch[1] = gt_batch[1][:, :pred_batch.shape[1],:,:,:]
             gt_batch[-1] = gt_batch[-1][:,:pred_batch.shape[1],:]   
         loss = self.cal_loss(pred_batch=pred_batch, gt_batch=gt_batch)
         self.log("test/loss", loss, sync_dist=True)
@@ -198,10 +198,12 @@ class MyModel(LightningModule):
         return preds[0]
 
     def cal_loss(self, pred_batch=None, gt_batch=None):
-        ipd_gt = gt_batch[1]
-        nb, nt, _, nmic, nsource = pred_batch.shape
-        pred_batch = pred_batch.reshape(nb*nt, -1, nsource).permute(0,2,1)
-        ipd_gt = ipd_gt.reshape(nb*nt,-1,nsource).permute(0,2,1)
+        ipd_gt = gt_batch[1]  # keep as 5D: (nb, nt, 2*nf, nmic-1, nsrc)
+        nb, nt, two_nf, nmic_m1, nsrc = pred_batch.shape
+        print("pred_batch", pred_batch.shape)
+        print("ipd_gt", ipd_gt.shape)
+        pred_batch = pred_batch.reshape(nb * nt, two_nf * nmic_m1, nsrc)
+        ipd_gt = ipd_gt.reshape(nb * nt, two_nf * nmic_m1, nsrc)
         # [sigle source do not need PIT for loss calculation]
         # pred_batch = pred_batch.to(self.dev)
         # best_metric, best_perm = permutation_invariant_training(pred_batch, ipd_gt, self.MSE_loss, 'min')
@@ -285,7 +287,7 @@ class MyModel(LightningModule):
                     for k in range(nsrc):
                         if (ipd_batch[i,j,:,:,k] == 0).all():
                             ipd_batch[i,j,:,:,k] = non_source_target.to(ipd_batch)
-        ipd_batch = ipd_batch.view(nb*nt, nf, nmic, nsrc)
+        # ipd_batch = ipd_batch.view(nb*nt, nf, nmic, nsrc)
         data += [targets_batch]
         data += [ipd_batch]
         data += [mic_loc]
