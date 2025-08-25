@@ -1,6 +1,6 @@
-jsonargparse
-pytorch-lightning
-numpy
-scipy
-matplotlib
-pandas
+jsonargparse==4.40.2
+pytorch-lightning==2.5.2
+numpy==1.26.4
+scipy==1.13.0
+matplotlib==3.8.4
+pandas==2.2.1
