@@ -200,8 +200,8 @@ class MyModel(LightningModule):
     def cal_loss(self, pred_batch=None, gt_batch=None):
         ipd_gt = gt_batch[1]  # keep as 5D: (nb, nt, 2*nf, nmic-1, nsrc)
         nb, nt, two_nf, nmic_m1, nsrc = pred_batch.shape
-        print("pred_batch", pred_batch.shape)
-        print("ipd_gt", ipd_gt.shape)
+        # print("pred_batch", pred_batch.shape)
+        # print("ipd_gt", ipd_gt.shape)
         pred_batch = pred_batch.reshape(nb * nt, two_nf * nmic_m1, nsrc)
         ipd_gt = ipd_gt.reshape(nb * nt, two_nf * nmic_m1, nsrc)
         # [sigle source do not need PIT for loss calculation]

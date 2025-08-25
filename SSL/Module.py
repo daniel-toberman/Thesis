@@ -685,20 +685,15 @@ class PredDOA(nn.Module):
             doa_est = pred_batch[0] * 180 / np.pi
             doa_est = doa_est.to(self.dev)
             doa_gt = doa_gt[:, :, :, np.newaxis].to(self.dev)
-            vad_gt = gt_batch[1].to(self.dev)
-            vad_est = torch.ones(vad_gt.shape).to(vad_gt)
             vad_gt = gt_batch[-1].to(self.dev)
+            vad_est = torch.ones(vad_gt.shape).to(vad_gt)
         metric_5 = {}
-        # metric_10 = {}
-        # print(doa_gt.shape)
         if idx != None:
             np.save('./results/' + str(idx) + '_doagt', doa_gt.cpu().numpy())
             np.save('./results/' + str(idx) + '_doaest', doa_est.cpu().numpy())
             np.save('./results/' + str(idx) + '_vadgt', vad_gt.cpu().numpy())
             np.save('./results/' + str(idx) + '_vadest', vad_est.cpu().numpy())
 
-        # metric_10['ACC'], metric_10['MAE'], = \
-        # 	self.getmetric(doa_gt, vad_gt, doa_est, vad_est, ae_mode = ae_mode, ae_TH=10, useVAD=False, vad_TH=vad_TH)
         metric_5['ACC'], metric_5['MAE'], = \
             self.getmetric(doa_gt, vad_gt, doa_est, vad_est, ae_mode=ae_mode, ae_TH=5, useVAD=True, vad_TH=vad_TH)
         return metric_5  # , metric_10
