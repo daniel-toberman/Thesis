@@ -661,7 +661,7 @@ class PredDOA(nn.Module):
 			vad_gt = gt_batch[-1].to(self.dev)
 		metric_5 = {}
 		#metric_10 = {}
-		print(doa_gt.shape)
+		# print(doa_gt.shape)
 		if idx != None:
 			np.save('./results/'+str(idx)+'_doagt',doa_gt.cpu().numpy())
 			np.save('./results/'+str(idx)+'_doaest',doa_est.cpu().numpy())

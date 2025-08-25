@@ -1,0 +1,371 @@
+{   
+    "//comment": "duration in minutes [train, validation, test]",
+    "Cafeteria1": {
+        "static_duration": [76, 0, 40],
+        "moving_duration": [45, 0, 22],
+        "noise_duration": [483, 0, 120],
+        "scene_type": "indoor",
+        "text_description": "the first floor of the canteen inside the university, near the entrance.",
+        "T60":"0.763"
+    },
+    "OfficeLobby": {
+        "static_duration": [47, 29, 5],
+        "moving_duration": [51, 28, 8],
+        "noise_duration": [144, 42, 21],
+        "scene_type": "indoor",
+        "text_description": "lobby at the entrance to the building",
+        "T60":"2.476"
+    },
+    "BasketballCourt1": {
+        "static_duration": [34, 10, 39],
+        "moving_duration": [40, 8, 42],
+        "noise_duration": [315, 52, 158],
+        "scene_type": "outdoor",
+        "text_description": "outdoor sports field",
+        "T60":"None"
+    },
+    "BadmintonCourt1": {
+        "static_duration": [73, 13, 0],
+        "moving_duration": [40, 7, 0],
+        "noise_duration": [317, 80, 0],
+        "scene_type": "indoor",
+        "text_description": "a badminton court with four courts",
+        "T60":"1.577"
+    },
+    "Classroom1": {
+        "static_duration": [76, 0, 0],
+        "moving_duration": [72, 0, 0],
+        "noise_duration": [338, 25, 120],
+        "scene_type": "indoor",
+        "text_description": "a small classroom for university classes",
+        "T60":"0.816"
+    },
+    "OfficeRoom3": {
+        "static_duration": [68, 3, 5],
+        "moving_duration": [81, 7, 8],
+        "noise_duration": [214, 72, 72],
+        "scene_type": "indoor",
+        "text_description": "a small conference room surrounded by glass walls",
+        "T60":"1.295"
+    },
+    "LivingRoom1": {
+        "static_duration": [81, 0, 0],
+        "moving_duration": [69, 0, 0],
+        "noise_duration": [0, 0, 7],
+        "scene_type": "indoor",
+        "text_description": "the living room of the on-campus apartment",
+        "T60":"0.598"
+    },
+    "LivingRoom2": {
+        "static_duration": [8, 0, 9],
+        "moving_duration": [9, 0, 7],
+        "noise_duration": 0,
+        "scene_type": "indoor",
+        "text_description": "the bedroom of the on-campus apartment",
+        "T60":"0.844"
+    },
+    "Gym": {
+        "static_duration": [73, 1, 0],
+        "moving_duration": [71, 6, 0],
+        "noise_duration": [293, 33, 0],
+        "scene_type": "indoor",
+        "text_description": "gym",
+        "T60":"1.504"
+    },
+    "Market": {
+        "static_duration": [90, 9, 0],
+        "moving_duration": [128, 8, 0],
+        "noise_duration": [255, 29, 0],
+        "scene_type": "indoor",
+        "text_description": "a market selling vegetables, meat and aquatic products",
+        "T60":"1.228"
+    },
+    "Car-Gasoline": {
+        "static_duration": [100, 0, 17],
+        "moving_durnoise_duration": 0,
+        "noise_duration": [189, 0, 81],
+        "scene_type": "transportation",
+        "text_description": "a car that runs on gasoline",
+        "T60":"0.069"
+    },
+    "Car-Electric": {
+        "static_duration": [51, 42, 23],
+        "moving_duration": 0,
+        "noise_duration": [172, 129, 129],
+        "scene_type": "transportation",
+        "text_description": "A car that runs only on electricity",
+        "T60":"0.086"
+    },
+    "LivingRoom3": {
+        "static_duration": [88, 0, 0],
+        "moving_duration": [99, 0, 0],
+        "noise_duration": 0,
+        "scene_type": "indoor",
+        "text_description": "hotel room with two single beds",
+        "T60":"0.376"
+    },
+    "LivingRoom4": {
+        "static_duration": [200, 0, 36],
+        "moving_duration": [147, 0, 26],
+        "noise_duration": 0,
+        "scene_type": "indoor",
+        "text_description": "a small two-story apartment",
+        "T60":"0.427"
+    },
+    "LivingRoom5": {
+        "static_duration": [90, 0, 10],
+        "moving_duration": [84, 0, 10],
+        "noise_duration": 0,
+        "scene_type": "indoor",
+        "text_description": "the living room of the B&B",
+        "T60":"0.562"
+    },
+    "LivingRoom6": {
+        "static_duration": [54, 15, 0],
+        "moving_duration": [51, 18, 0],
+        "noise_duration": 0,
+        "scene_type": "indoor",
+        "text_description": "the bedroom of the B&B",
+        "T60":"0.398"
+    },
+    "LivingRoom7": {
+        "static_duration": [132, 0, 0],
+        "moving_duration": [84, 0, 0],
+        "noise_duration": 0,
+        "scene_type": "indoor",
+        "text_description": "a party house with lots of mini games",
+        "T60":"0.680"
+    },
+    "LivingRoom8": {
+        "static_duration": [68, 22, 0],
+        "moving_duration": [49, 14, 0],
+        "noise_duration": 0,
+        "scene_type": "indoor",
+        "text_description": "a student dormitory with two bedrooms",
+        "T60":"0.399"
+    },
+    "Library": {
+        "static_duration": [100, 0, 26],
+        "moving_duration": [69, 0, 21],
+        "noise_duration": 0,
+        "scene_type": "indoor",
+        "text_description": "a circular library",
+        "T60":"1.180"
+    },
+    "Classroom2": {
+        "static_duration": [101, 0, 14],
+        "moving_duration": [81, 0, 7],
+        "noise_duration": 0,
+        "scene_type": "indoor",
+        "text_description": "a lecture hall in a university",
+        "T60":"0.679"
+    },
+    "SunkenPlaza1": {
+        "static_duration": [81, 11, 9],
+        "moving_duration": [68, 15, 8],
+        "noise_duration": 0,
+        "scene_type": "semi-outdoor",
+        "text_description": "a sunken square surrounded by a dining hall",
+        "T60":"0.915"
+    },
+    "Auditorium": {
+        "static_duration": [123, 14, 0],
+        "moving_duration": [73, 11, 0],
+        "noise_duration": 0,
+        "scene_type": "indoor",
+        "text_description": "a large two-story auditorium",
+        "T60":"1.179"
+    },
+    "OfficeRoom4": {
+        "static_duration": [80, 0, 14],
+        "moving_duration": [60, 0, 11],
+        "noise_duration": 0,
+        "scene_type": "indoor",
+        "text_description": "a medium-sized ktv box for 10 people",
+        "T60":"0.888"
+    },
+    "UndergroundParking1": {
+        "static_duration": [125, 0, 0],
+        "moving_duration": [103, 0, 0],
+        "noise_duration": 0,
+        "scene_type": "indoor",
+        "text_description": "an underground car park",
+        "T60":"2.923"
+    },
+    "Classroom3": {
+        "static_duration": [86, 0, 39],
+        "moving_duration": [55, 0, 26],
+        "noise_duration": 0,
+        "scene_type": "indoor",
+        "text_description": "an art classroom in an elementary school",
+        "T60":"1.358"
+    },
+    "Bus-Electric": {
+        "static_duration": [109, 0, 0],
+        "moving_duration": [7, 0, 0],
+        "noise_duration": [250, 0, 0],
+        "scene_type": "transportation",
+        "text_description": "a bus",
+        "T60":"0.283"
+    },
+    "Terrace1": {
+        "static_durnoise_duration": 0,
+        "moving_durnoise_duration": 0,
+        "noise_duration": [239, 0, 0],
+        "scene_type": "semi_outdoor",
+        "text_description": "a large open-air balcony on the second floor",
+        "T60":"0.355"
+    },
+    "Laundry": {
+        "static_durnoise_duration": 0,
+        "moving_durnoise_duration": 0,
+        "noise_duration": [28, 7, 12],
+        "scene_type": "indoor",
+        "text_description": "a laundry room in a university dormitory",
+        "T60":"0.534"
+    },
+    "LivingRoom9": {
+        "static_durnoise_duration": 0,
+        "moving_durnoise_duration": 0,
+        "noise_duration": [45, 0, 0],
+        "scene_type": "indoor",
+        "text_description": "recording apartment decoration noise",
+        "T60":"0.562"
+    },
+    "Terrace2": {
+        "static_durnoise_duration": 0,
+        "moving_durnoise_duration": 0,
+        "noise_duration": [26, 0, 0],
+        "scene_type": "semi-outdoor",
+        "text_description": "recording the sound of rain under the eaves of a building",
+        "T60":"0.6045"
+    },
+    "Roadside1": {
+        "static_durnoise_duration": 0,
+        "moving_durnoise_duration": 0,
+        "noise_duration": [169, 0, 0],
+        "scene_type": "outdoor",
+        "text_description": "on the sidewalk at the intersection",
+        "T60":"None"
+    },
+    "ConstructionPlant": {
+        "static_durnoise_duration": 0,
+        "moving_durnoise_duration": 0,
+        "noise_duration": [346, 0, 0],
+        "scene_type": "outdoor",
+        "text_description": "next to a construction site under construction",
+        "T60":"None"
+    },
+    "Cafeteria2": {
+        "static_durnoise_duration": 0,
+        "moving_durnoise_duration": 0,
+        "noise_duration": [443, 0, 0],
+        "scene_type": "indoor",
+        "text_description": "a Chinese restaurant",
+        "T60":"1.242"
+    },
+    "Park": {
+        "static_durnoise_duration": 0,
+        "moving_durnoise_duration": 0,
+        "noise_duration": [338, 0, 0],
+        "scene_type": "outdoor",
+        "text_description": "inside a park",
+        "T60":"None"
+    },
+    "PedestrianStreet": {
+        "static_durnoise_duration": 0,
+        "moving_durnoise_duration": 0,
+        "noise_duration": [495, 0, 0],
+        "scene_type": "semi-outdoor",
+        "text_description": "a pedestrian street in the commercial center",
+        "T60":"0.336"
+    },
+    "BarberShop": {
+        "static_durnoise_duration": 0,
+        "moving_durnoise_duration": 0,
+        "noise_duration": [213, 0, 0],
+        "scene_type": "indoor",
+        "text_description": "inside a barbershop",
+        "T60":"0.653"
+    },
+    "ShoppingMall": {
+        "static_durnoise_duration": 0,
+        "moving_durnoise_duration": 0,
+        "noise_duration": [327, 0, 0],
+        "scene_type": "indoor",
+        "text_description": "inside a large shopping mall",
+        "T60":"0.946"
+    },
+    "SunkenPlaza2": {
+        "static_durnoise_duration": 0,
+        "moving_durnoise_duration": 0,
+        "noise_duration": [167, 36, 36],
+        "scene_type": "semi-outdoor",
+        "text_description": "a sunken square surrounded by sports venues",
+        "T60":"0.915"
+    },
+    "Roadside2": {
+        "static_durnoise_duration": 0,
+        "moving_durnoise_duration": 0,
+        "noise_duration": [163, 0, 0],
+        "scene_type": "outdoor",
+        "text_description": "at a roadside bus stop",
+        "T60":"None"
+    },
+    "Subway-Electric": {
+        "static_durnoise_duration": 0,
+        "moving_durnoise_duration": 0,
+        "noise_duration": [177, 0, 0],
+        "scene_type": "transportation",
+        "text_description": "inside the subway",
+        "T60":"None"
+    },
+    "OfficeRoom1": {
+        "static_duration": [0, 39, 0],
+        "moving_duration": [0, 36, 0],
+        "noise_duration": 0,
+        "scene_type": "indoor",
+        "text_description": "an office with partitions for each station",
+        "T60":"0.719"
+    },
+    "OfficeRoom2": {
+        "static_duration": [0, 0, 38],
+        "moving_duration": [0, 0, 37],
+        "noise_duration": [0, 0, 118],
+        "scene_type": "indoor",
+        "text_description": "an office for one person",
+        "T60":"0.490"
+    },
+    "UndergroundParking2": {
+        "static_duration": [0, 0, 43],
+        "moving_duration": [0, 0, 27],
+        "noise_duration": [233, 0, 100],
+        "scene_type": "indoor",
+        "text_description": "another position of the underground car park",
+        "T60":"4.928"
+    },
+    "Cafeteria3": {
+        "static_duration": [0, 34, 0],
+        "moving_duration": [0, 25, 0],
+        "noise_duration": [0, 286, 0],
+        "scene_type": "indoor",
+        "text_description": "the university dining hall on the second floor, near the dining area",
+        "T60":"0.843"
+    },
+    "BadmintonCourt2": {
+        "static_duration": [0, 0, 43],
+        "moving_duration": [0, 0, 28],
+        "noise_duration": [0, 0, 355],
+        "scene_type": "indoor",
+        "text_description": "another position of the badminton court",
+        "T60":"1.694"
+    },
+    "BasketballCourt2": {
+        "static_duration": [0, 33, 0],
+        "moving_duration": [0, 28, 0],
+        "noise_duration": [0, 166, 0],
+        "scene_type": "outdoor",
+        "text_description": "an outdoor basketball court containing three courts",
+        "T60": "None"
+    }
+}

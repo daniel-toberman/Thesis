@@ -101,29 +101,19 @@ class RealData(Dataset):
 
     def load_signals(self, sig_path, use_mic_id):
         channels = []
-        target_len = self.wav_use_len  # expected fixed length
-
         for i in use_mic_id:
             temp_path = sig_path.replace('.flac', f'_CH{i}.wav')
             single_ch_signal, fs = sf.read(temp_path, dtype="float32")
-
-            # adjust length
-            if len(single_ch_signal) > target_len:
-                single_ch_signal = single_ch_signal[:target_len]  # truncate
-            elif len(single_ch_signal) < target_len:
-                pad_width = target_len - len(single_ch_signal)
-                single_ch_signal = np.pad(single_ch_signal, (0, pad_width), mode="constant")
-
             channels.append(single_ch_signal)
-
-        # now all channels are the same length
+        lengths = [len(c) for c in channels]
+        L = int(min(lengths))
+        if any(l != L for l in lengths):
+            channels = [c[:L] for c in channels]
         mul_ch_signals = np.stack(channels, axis=-1)
         return mul_ch_signals, fs
 
     def load_noise(self, noise_path, begin_index, end_index, use_mic_id):
         channels = []
-        target_len = end_index - begin_index  # requested slice length
-
         for i in use_mic_id:
             temp_path = noise_path.replace('_CH1.flac', f'_CH{i}.wav')
             try:
@@ -133,16 +123,11 @@ class RealData(Dataset):
             except Exception as e:
                 print(f"Error reading {temp_path}: {e}")
                 continue
-
-            # enforce target length
-            if len(single_ch_signal) > target_len:
-                single_ch_signal = single_ch_signal[:target_len]
-            elif len(single_ch_signal) < target_len:
-                pad_width = target_len - len(single_ch_signal)
-                single_ch_signal = np.pad(single_ch_signal, (0, pad_width), mode="constant")
-
             channels.append(single_ch_signal)
-
+        lengths = [len(c) for c in channels]
+        L = int(min(lengths))
+        if any(l != L for l in lengths):
+            channels = [c[:L] for c in channels]
         mul_ch_signals = np.stack(channels, axis=-1)
         return mul_ch_signals, fs
 
@@ -183,7 +168,7 @@ class RealData(Dataset):
                 mic_signal = self.resample(mic_signal=mic_signal, fs=fs, new_fs=self.target_fs)
             len_signal = mic_signal.shape[0] / self.target_fs
             # pading or cut the source signal
-            if len_signal < self.wav_use_len:
+            if len_signal <= self.wav_use_len:
                 input_length = int(self.wav_use_len * self.target_fs)
                 input_mic_signal = np.zeros((input_length, mic_signal.shape[1]))
                 min_length = min(input_length, mic_signal.shape[0])
