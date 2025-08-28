@@ -16,7 +16,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # ==== Python dependencies ====
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# strip any --hash=sha256:... pins so pip can choose the correct Linux/CUDA wheels
+RUN python - <<'PY'
+import re, pathlib
+txt = pathlib.Path('requirements.txt').read_text()
+txt = re.sub(r'\s*--hash=sha256:[a-f0-9]{64}', '', txt)   # remove all hash pins
+txt = re.sub(r'\n{2,}', '\n', txt).strip() + '\n'        # tidy up
+pathlib.Path('requirements.nohash.txt').write_text(txt)
+PY
+
+# (optional but recommended) upgrade pip, then install
+RUN python -m pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.nohash.txt
+
 
 # ==== Project files ====
 COPY . .
