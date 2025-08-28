@@ -8,6 +8,18 @@ from scipy.io import wavfile
 from scipy import signal
 from utils_ import search_files, audiowu_high_array_geometry
 from pathlib import Path
+import re  # add if not already imported
+
+def _label_key_from(sig_path: str) -> str:
+    """
+    Minimal normalization for label lookup:
+    - make it relative to '/extracted/'
+    - convert .wav -> .flac for CSV index
+    """
+    posix = sig_path.replace("\\", "/")
+    key = posix.split("/extracted/", 1)[-1]  # robust for any partition root
+    key = re.sub(r"\.wav$", ".flac", key, flags=re.IGNORECASE)
+    return key
 
 
 class RealData(Dataset):
@@ -176,7 +188,7 @@ class RealData(Dataset):
                 dp_vad_temp = self.cal_vad(dp_signal)
                 if dp_vad_temp.shape[0] > 40:
                     dp_vad_temp = dp_vad_temp[:40, :]
-                target = self.all_targets.at[sig_path.split('RealMAN/extracted/')[-1], 'angle(°)']
+                target = self.all_targets.at[_label_key_from(sig_path), 'angle(°)']
                 if isinstance(target, float):
                     targets = torch.ones((self.target_len, 1)) * int(target)
                     vad_source = torch.zeros((self.target_len, 1))
@@ -201,7 +213,7 @@ class RealData(Dataset):
                 input_mic_signal, signal_start, input_dp_signal = self.seg_signal(signal=mic_signal, fs=self.target_fs,
                     dp_signal=dp_signal, rng=rng)
                 dp_vad = self.cal_vad(input_dp_signal)
-                target = self.all_targets.at[sig_path.split('RealMAN/extracted/')[-1], 'angle(°)']
+                target = self.all_targets.at[_label_key_from(sig_path), 'angle(°)']
                 if isinstance(target, float):
                     targets = torch.ones((self.target_len, 1)) * int(target)
                     vad_source = torch.ones((self.target_len, 1))
@@ -307,7 +319,7 @@ class RealData(Dataset):
 
             # targets
 
-            target = self.all_targets.at[sig_path.split('RealMAN/extracted/')[-1], 'angle(°)']
+            target = self.all_targets.at[_label_key_from(sig_path), 'angle(°)']
 
             if isinstance(target, float):
                 targets = torch.ones((num_points, 1)) * int(target)
