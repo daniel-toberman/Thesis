@@ -40,3 +40,21 @@ fit
 
 
 python SSL\run_CRNN.py fit --trainer.devices=auto --trainer.accelerator=gpu --trainer.precision=16-mixed --trainer.strategy=auto --trainer.max_epochs=100
+
+
+runai submit thesis-train \
+  -i toberman/thesis:latest \
+  --name thesis-train \
+  --gpu 1 \
+  --cpu 6 --memory 32G --large-shm \
+  --working-dir /workspace \
+  --env DATA_ROOT=/storage/daniel_toberman/RealMAN_dataset_T60_08/extracted \
+  --env CSV_ROOT=/storage/daniel_toberman/RealMAN_dataset_T60_08 \
+  --env NOISE_ROOT=/storage/daniel_toberman/RealMAN_dataset_T60_08/extracted \
+  --command -- \
+  python SSL/run_CRNN.py fit \
+    --trainer.devices=1 \
+    --trainer.accelerator=gpu \
+    --trainer.precision=16-mixed \
+    --trainer.strategy=auto \
+    --trainer.max_epochs=100
