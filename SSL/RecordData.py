@@ -126,9 +126,8 @@ class RealData(Dataset):
 
     def load_noise(self, noise_path, begin_index, end_index, use_mic_id):
         channels = []
-        root, ext = os.path.splitext(noise_path)  # ext is ".wav"
         for i in use_mic_id:
-            temp_path = noise_path.replace(f'_CH1{ext}', f'_CH{i}{ext}')
+            temp_path = noise_path.replace('_CH1.wav', f'_CH{i}.wav')
             try:
                 single_ch_signal, fs = sf.read(
                     temp_path, start=begin_index, stop=end_index, dtype="float32"
