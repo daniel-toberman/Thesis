@@ -29,26 +29,26 @@ def _norm(p: str) -> str:
     # make slashes portable and strip trailing slash once
     return p.replace("\\", "/").rstrip("/")
 
-DATA_ROOT  = _norm(os.environ.get("DATA_ROOT",  r"D:/RealMAN/RealMAN_dataset_T60_08/extracted/"))
-CSV_ROOT   = _norm(os.environ.get("CSV_ROOT",   r"D:/RealMAN"))  # where the CSVs live (we also copied CSVs into the partition)
-NOISE_ROOT = _norm(os.environ.get("NOISE_ROOT", r"D:/RealMAN/extracted"))
+DATA_ROOT  = _norm(os.environ.get("DATA_ROOT",  r"D:/RealMAN_filtered/extracted/"))
+CSV_ROOT   = _norm(os.environ.get("CSV_ROOT",   r"D:/RealMAN_filtered"))  # where the CSVs live (we also copied CSVs into the partition)
+NOISE_ROOT = _norm(os.environ.get("NOISE_ROOT", r"D:/RealMAN_filtered/extracted"))
 
 dataset_train = RealData(
     data_dir = f"{DATA_ROOT}/",
-    target_dir = [f"{CSV_ROOT}/train/train_static_source_location_08.csv"],
+    target_dir = [f"{CSV_ROOT}/train/train_static_source_location.csv"],
     noise_dir = f"{NOISE_ROOT}/train/ma_noise/"
 )
 
 dataset_val = RealData(
     data_dir = f"{DATA_ROOT}/",
-    target_dir = [f"{CSV_ROOT}/val/val_static_source_location_08.csv"],
+    target_dir = [f"{CSV_ROOT}/val/val_static_source_location.csv"],
     noise_dir = f"{NOISE_ROOT}/val/ma_noise/",
     on_the_fly=False
 )
 
 dataset_test = RealData(
     data_dir = f"{DATA_ROOT}/",
-    target_dir = [f"{CSV_ROOT}/test/test_static_source_location_08.csv"],
+    target_dir = [f"{CSV_ROOT}/test/test_static_source_location.csv"],
     noise_dir = f"{NOISE_ROOT}/test/ma_noise/",
     on_the_fly=False
 )
