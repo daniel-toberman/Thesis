@@ -232,10 +232,13 @@ class RealData(Dataset):
 
             wav_info = sf.info(noise_path)
             noise_sr = wav_info.samplerate
-            window_frames = int(self.wav_use_len * noise_sr)  # 4s in noise file's frames
-            start_max = max(0, wav_info.frames - window_frames)
+            window_frames = int(self.wav_use_len * noise_sr)  # 4 s in noise frames
+            total_frames = wav_info.frames
+
+            # choose a valid begin; if file is shorter than 4 s, force begin=0
+            start_max = max(0, total_frames - window_frames)
             noise_begin_index = int(rng.integers(low=0, high=start_max + 1))
-            noise_end_index = noise_begin_index + window_frames
+            noise_end_index = min(noise_begin_index + window_frames, total_frames)
 
             noise_signal, noise_fs = self.load_noise(
                 noise_path,
@@ -248,7 +251,7 @@ class RealData(Dataset):
             if noise_fs != self.target_fs:
                 noise_signal = self.resample(noise_signal, noise_fs, self.target_fs)
 
-            # enforce exact length (match input_mic_signal = 4s@target_fs)
+            # enforce exact 4 s length
             target_len_samples = int(self.wav_use_len * self.target_fs)
             n = noise_signal.shape[0]
             if n < target_len_samples:
