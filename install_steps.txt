@@ -39,7 +39,9 @@ fit
 
 
 On windows:
-python SSL\run_CRNN.py fit --trainer.devices=auto --trainer.accelerator=gpu --trainer.precision=16-mixed --trainer.strategy=auto --trainer.max_epochs=100
+python SSL\run_CRNN.py fit --trainer.devices=auto --trainer.accelerator=gpu --trainer.precision=16-mixed --trainer.strategy=auto --trainer.max_epochs=50
+python SSL\run_IPDnet.py fit --trainer.devices=auto --trainer.accelerator=gpu --trainer.precision=16-mixed --trainer.strategy=auto --trainer.max_epochs=50
+
 Test:
 mkdir results && python SSL\run_CRNN.py test --ckpt_path "D:\SSL_logs\MyModel\version_25\checkpoints\last.ckpt" --trainer.accelerator=auto --trainer.devices=1 --trainer.precision=16-mixed --trainer.strategy=auto --trainer.num_nodes=1
 
