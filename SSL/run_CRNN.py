@@ -13,6 +13,7 @@ from packaging.version import Version
 from torch.utils.data import DataLoader, Dataset
 from pytorch_lightning.cli import LightningArgumentParser, LightningCLI
 from pytorch_lightning import LightningDataModule, LightningModule
+from pytorch_lightning.loggers import WandbLogger
 from torch import Tensor
 import torch
 from typing import Tuple
@@ -142,15 +143,19 @@ class MyModel(LightningModule):
         if self.current_epoch == 0:
             if self.trainer.is_global_zero and hasattr(self.logger, 'log_dir') and 'notag' not in self.hparams.exp_name:
                 tag_and_log_git_status(self.logger.log_dir + '/git.out', self.logger.version,
-                                       self.hparams.exp_name, model_name=type(self).__name__)
+                    self.hparams.exp_name, model_name=type(self).__name__)
 
             if self.trainer.is_global_zero and hasattr(self.logger, 'log_dir'):
                 with open(self.logger.log_dir + '/model.txt', 'a') as f:
                     f.write(str(self))
                     f.write('\n\n\n')
-                # measure the model FLOPs
-                # write_FLOPs(model=self, save_dir=self.logger.log_dir,
-                #             num_chns=2, fs=16000, audio_time_len=4, model_file=__file__)
+
+        # NEW: enable W&B watch (safe if not W&B; guard by type)
+        try:
+            if isinstance(self.logger, WandbLogger):
+                self.logger.watch(self.arch, log="all", log_freq=200)
+        except Exception:
+            pass
 
     def training_step(self, batch, batch_idx: int):
         mic_sig_batch = batch[0]
@@ -286,7 +291,9 @@ class MyCLI(LightningCLI):
         parser.set_defaults(
             {"trainer.strategy": "ddp"})
         parser.set_defaults({"trainer.accelerator": "gpu"})
-
+        parser.add_argument("--use_wandb", type=bool, default=False)
+        parser.add_argument("--wandb_project", type=str, default="SSL-CRNN")
+        parser.add_argument("--wandb_entity", type=str, default=None)  # optional team/org
         parser.add_lightning_class_args(EarlyStopping, "early_stopping")
         parser.set_defaults({
             "early_stopping.monitor": "valid/loss",
@@ -334,22 +341,43 @@ class MyCLI(LightningCLI):
         }
         parser.set_defaults(learning_rate_monitor_defaults)
 
-
     def before_fit(self):
         resume_from_checkpoint: str = self.config['fit']['ckpt_path']
+        use_wandb = bool(self.config.get('use_wandb', False))
+
         if resume_from_checkpoint is not None and resume_from_checkpoint.endswith('last.ckpt'):
             resume_from_checkpoint = os.path.normpath(resume_from_checkpoint)
             splits = resume_from_checkpoint.split(os.path.sep)
             version = int(splits[-3].replace('version_', ''))
             save_dir = os.path.sep.join(splits[:-3])
-            self.trainer.logger = TensorBoardLogger(
-                save_dir=save_dir, name="", version=version, default_hp_metric=False)
+
+            if use_wandb:
+                # W&B can resume to the same run if you pass id, but simplest is: new run, same name
+                self.trainer.logger = WandbLogger(
+                    project=self.config.get("wandb_project", "SSL-CRNN"),
+                    entity=self.config.get("wandb_entity", None),
+                    name=f"{type(self.model).__name__}-v{version}",
+                    save_dir=save_dir,
+                    log_model=True,
+                    )
+            else:
+                self.trainer.logger = TensorBoardLogger(
+                    save_dir=save_dir, name="", version=version, default_hp_metric=False)
         else:
             model_name = type(self.model).__name__
-            base_log_dir = r'D:\SSL_logs'  # <— put logs on D:
+            base_log_dir = r'D:\SSL_logs'
             os.makedirs(base_log_dir, exist_ok=True)
-            self.trainer.logger = TensorBoardLogger(
-                base_log_dir, name=model_name, default_hp_metric=False)
+            if use_wandb:
+                self.trainer.logger = WandbLogger(
+                    project=self.config.get("wandb_project", "SSL-CRNN"),
+                    entity=self.config.get("wandb_entity", None),
+                    name=self.model.hparams.exp_name if hasattr(self.model, "hparams") else "exp",
+                    save_dir=base_log_dir,
+                    log_model=True,
+                    )
+            else:
+                self.trainer.logger = TensorBoardLogger(
+                    base_log_dir, name=model_name, default_hp_metric=False)
 
     def before_test(self):
         torch.set_num_interop_threads(5)
@@ -371,13 +399,14 @@ class MyCLI(LightningCLI):
     def after_test(self):
         if not self.trainer.is_global_zero:
             return
-        import fnmatch
-        files = fnmatch.filter(os.listdir(
-            self.trainer.log_dir), 'events.out.tfevents.*')
-        for f in files:
-            os.remove(self.trainer.log_dir + '/' + f)
-            print('tensorboard log file for test is removed: ' +
-                  self.trainer.log_dir + '/' + f)
+        # Only clean TB logs
+        from pytorch_lightning.loggers import TensorBoardLogger as _TB
+        if isinstance(self.trainer.logger, _TB):
+            import fnmatch
+            files = fnmatch.filter(os.listdir(self.trainer.log_dir), 'events.out.tfevents.*')
+            for f in files:
+                os.remove(self.trainer.log_dir + '/' + f)
+                print('tensorboard log file for test is removed: ' + self.trainer.log_dir + '/' + f)
 
 
 if __name__ == '__main__':
