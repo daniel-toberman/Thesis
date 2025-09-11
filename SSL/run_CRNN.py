@@ -1,7 +1,8 @@
-#from OptSRPDNN import opt
+# from OptSRPDNN import opt
 from torch.utils.data import DataLoader, Dataset, DistributedSampler
 import numpy as np
 import sys, os
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import Module as at_module
 import SSL.CRNN as at_model
@@ -20,39 +21,44 @@ from typing import Tuple
 import os
 from RecordData import RealData
 from sampler import MyDistributedSampler
+
 os.environ['TORCH_CUDNN_V8_API_ENABLED'] = '1'
 os.environ["OMP_NUM_THREADS"] = str(8)
 torch.backends.cuda.matmul.allow_tf32 = True
 # The flag below controls whether to allow TF32 on cuDNN. This flag defaults to True.
 torch.backends.cudnn.allow_tf32 = True
+
+
 # torch.set_float32_matmul_precision('medium')
 def _norm(p: str) -> str:
     # make slashes portable and strip trailing slash once
     return p.replace("\\", "/").rstrip("/")
 
-DATA_ROOT  = _norm(os.environ.get("DATA_ROOT",  r"D:/RealMAN_filtered/extracted/"))
-CSV_ROOT   = _norm(os.environ.get("CSV_ROOT",   r"D:/RealMAN_filtered"))  # where the CSVs live (we also copied CSVs into the partition)
+
+DATA_ROOT = _norm(os.environ.get("DATA_ROOT", r"D:/RealMAN_filtered/extracted/"))
+CSV_ROOT = _norm(
+    os.environ.get("CSV_ROOT", r"D:/RealMAN_filtered"))  # where the CSVs live (we also copied CSVs into the partition)
 NOISE_ROOT = _norm(os.environ.get("NOISE_ROOT", r"D:/RealMAN_filtered/extracted"))
 
 dataset_train = RealData(
-    data_dir = f"{DATA_ROOT}/",
-    target_dir = [f"{CSV_ROOT}/train/train_static_source_location.csv"],
-    noise_dir = f"{NOISE_ROOT}/train/ma_noise/"
-)
+    data_dir=f"{DATA_ROOT}/",
+    target_dir=[f"{CSV_ROOT}/train/train_static_source_location_08.csv"],
+    noise_dir=f"{NOISE_ROOT}/train/ma_noise/"
+    )
 
 dataset_val = RealData(
-    data_dir = f"{DATA_ROOT}/",
-    target_dir = [f"{CSV_ROOT}/val/val_static_source_location.csv"],
-    noise_dir = f"{NOISE_ROOT}/val/ma_noise/",
+    data_dir=f"{DATA_ROOT}/",
+    target_dir=[f"{CSV_ROOT}/val/val_static_source_location_08.csv"],
+    noise_dir=f"{NOISE_ROOT}/val/ma_noise/",
     on_the_fly=False
-)
+    )
 
 dataset_test = RealData(
-    data_dir = f"{DATA_ROOT}/",
-    target_dir = [f"{CSV_ROOT}/test/test_static_source_location.csv"],
-    noise_dir = f"{NOISE_ROOT}/test/ma_noise/",
+    data_dir=f"{DATA_ROOT}/",
+    target_dir=[f"{CSV_ROOT}/test/test_static_source_location_08.csv"],
+    noise_dir=f"{NOISE_ROOT}/test/ma_noise/",
     on_the_fly=False
-)
+    )
 
 
 class MyDataModule(LightningDataModule):
@@ -98,6 +104,7 @@ class MyDataModule(LightningDataModule):
             prefetch_factor=2,
             )
 
+
 class MyModel(LightningModule):
 
     def __init__(
@@ -113,14 +120,14 @@ class MyModel(LightningModule):
             return_metric: bool = True,
             compile: bool = False,
             device: str = 'cuda',
-            exp_name: str = 'exp',            
-    ):
+            exp_name: str = 'exp',
+            ):
         super().__init__()
         self.arch = at_model.CRNN()
         if compile:
             assert Version(torch.__version__) >= Version(
                 '2.0.0'), torch.__version__
-            
+
             self.arch = torch.compile(self.arch)
 
         # save all the parameters to self.hparams
@@ -132,10 +139,11 @@ class MyModel(LightningModule):
         self.return_metric = return_metric
         self.dostft = at_module.STFT(
             win_len=win_len, win_shift_ratio=win_shift_ratio, nfft=nfft)
-        self.fre_range_used = range(1, int(self.nfft/2)+1, 1)
+        self.fre_range_used = range(1, int(self.nfft / 2) + 1, 1)
         self.get_metric = at_module.PredDOA()
         self.dev = device
         self.res_phi = res_phi
+
     def forward(self, x):
         return self.arch(x)
 
@@ -163,7 +171,7 @@ class MyModel(LightningModule):
         vad_batch = batch[2]
         data_batch = self.data_preprocess(mic_sig_batch, targets_batch)
         in_batch = data_batch[0]
-        gt_batch = [data_batch[1],vad_batch]
+        gt_batch = [data_batch[1], vad_batch]
         pred_batch = self(in_batch)
         loss = self.cal_cls_loss(pred_batch=pred_batch, gt_batch=gt_batch)
         self.log("train/loss", loss, prog_bar=True)
@@ -175,103 +183,105 @@ class MyModel(LightningModule):
         vad_batch = batch[2]
         data_batch = self.data_preprocess(mic_sig_batch, targets_batch)
         in_batch = data_batch[0]
-        gt_batch = [data_batch[1],vad_batch]
+        gt_batch = [data_batch[1], vad_batch]
         pred_batch = self(in_batch)
         if pred_batch.shape[1] > gt_batch[0].shape[1]:
-            pred_batch = pred_batch[:,:gt_batch[0].shape[1],:]
+            pred_batch = pred_batch[:, :gt_batch[0].shape[1], :]
         else:
-            gt_batch[0] = gt_batch[0][:,:pred_batch.shape[1],:]
-            gt_batch[1] = gt_batch[1][:,:pred_batch.shape[1],:]   
+            gt_batch[0] = gt_batch[0][:, :pred_batch.shape[1], :]
+            gt_batch[1] = gt_batch[1][:, :pred_batch.shape[1], :]
         loss = self.cal_cls_loss(pred_batch=pred_batch, gt_batch=gt_batch)
         self.log("valid/loss", loss, sync_dist=True)
-        metric = self.get_metric(pred_batch=pred_batch,gt_batch=gt_batch,idx=None,tar_type='spect')
+        metric = self.get_metric(pred_batch=pred_batch, gt_batch=gt_batch, idx=None, tar_type='spect')
         for m in metric:
-            self.log('valid/'+m, metric[m].item(), sync_dist=True)       
+            self.log('valid/' + m, metric[m].item(), sync_dist=True)
 
     def test_step(self, batch: Tensor, batch_idx: int):
         mic_sig_batch = batch[0]
         targets_batch = batch[1]
         vad_batch = batch[2]
-        data_batch = self.data_preprocess(mic_sig_batch, targets_batch = targets_batch)
+        data_batch = self.data_preprocess(mic_sig_batch, targets_batch=targets_batch)
         in_batch = data_batch[0]
-        gt_batch = [data_batch[1],vad_batch]
+        gt_batch = [data_batch[1], vad_batch]
         pred_batch = self(in_batch)
         if pred_batch.shape[1] > gt_batch[0].shape[1]:
-            pred_batch = pred_batch[:,:gt_batch[0].shape[1],:]
+            pred_batch = pred_batch[:, :gt_batch[0].shape[1], :]
         else:
-            gt_batch[0] = gt_batch[0][:,:pred_batch.shape[1],:]
-            gt_batch[1] = gt_batch[1][:,:pred_batch.shape[1],:] 
-        #print(pred_batch.shape)           
+            gt_batch[0] = gt_batch[0][:, :pred_batch.shape[1], :]
+            gt_batch[1] = gt_batch[1][:, :pred_batch.shape[1], :]
+            # print(pred_batch.shape)
         loss = self.cal_cls_loss(pred_batch=pred_batch, gt_batch=gt_batch)
         self.log("test/loss", loss, sync_dist=True)
-        metric = self.get_metric(pred_batch=pred_batch,gt_batch=gt_batch,idx=batch_idx,tar_type='spect')
+        metric = self.get_metric(pred_batch=pred_batch, gt_batch=gt_batch, idx=batch_idx, tar_type='spect')
         for m in metric:
-            self.log('test/'+m, metric[m].item(), sync_dist=True)
-            #self.log('test2/'+m, metric2[m].item(), sync_dist=True)
+            self.log('test/' + m, metric[m].item(), sync_dist=True)
+            # self.log('test2/'+m, metric2[m].item(), sync_dist=True)
 
     def predict_step(self, batch, batch_idx: int):
-        data_batch = self.data_preprocess(mic_sig_batch=batch.permute(0,2,1))
-        in_batch = data_batch[0]        
+        data_batch = self.data_preprocess(mic_sig_batch=batch.permute(0, 2, 1))
+        in_batch = data_batch[0]
         preds = self.forward(in_batch)
         return preds[0]
 
     def MSE_loss(self, preds, targets):
         nbatch = preds.shape[0]
-        sum_loss = torch.nn.functional.mse_loss(preds, targets, reduction='none').contiguous().view(nbatch,-1)
+        sum_loss = torch.nn.functional.mse_loss(preds, targets, reduction='none').contiguous().view(nbatch, -1)
         item_num = sum_loss.shape[1]
         return sum_loss.sum(axis=1) / item_num
 
     def cal_cls_loss(self, pred_batch=None, gt_batch=None):
         doa_batch = gt_batch[0]
         vad_batch = gt_batch[1]
-        doa_batch = doa_batch[:,:,:].type(torch.LongTensor).cuda()
-        nb,nt,_ = pred_batch.shape
-        new_target_batch = torch.zeros(nb,nt,self.res_phi)
+        doa_batch = doa_batch[:, :, :].type(torch.LongTensor).cuda()
+        nb, nt, _ = pred_batch.shape
+        new_target_batch = torch.zeros(nb, nt, self.res_phi)
         for b in range(nb):
             for t in range(nt):
-                new_target_batch[b,t,:] = self.gaussian_encode_symmetric(angles=doa_batch[b,t,],res_phi=self.res_phi)
+                new_target_batch[b, t, :] = self.gaussian_encode_symmetric(angles=doa_batch[b, t,],
+                    res_phi=self.res_phi)
         vad_expanded = vad_batch.expand(-1, -1, self.res_phi)
         new_target_batch = new_target_batch * vad_expanded.to(new_target_batch)
-        
+
         pred_batch_cart = pred_batch.to(self.dev)
         new_target_batch = new_target_batch.to(self.dev)
         loss = torch.nn.functional.mse_loss(
             pred_batch_cart.contiguous(), new_target_batch.contiguous())
         return loss
 
-    def gaussian_encode_symmetric(self, angles,res_phi,sigma=16):
+    def gaussian_encode_symmetric(self, angles, res_phi, sigma=16):
         def gaussian_func_symmetric(gt_angle, sigma):
-            angles = torch.arange(res_phi)#.to(gt_angle)
+            angles = torch.arange(res_phi)  # .to(gt_angle)
             distance = torch.minimum(torch.abs(angles - gt_angle.item()), torch.abs(angles - gt_angle.item() + res_phi))
             out = torch.exp(-0.5 * (distance % res_phi) ** 2 / sigma ** 2)
             return out
-        spectrum = torch.zeros(res_phi)#.to(angles)
+
+        spectrum = torch.zeros(res_phi)  # .to(angles)
         if angles.shape[0] == 0:
             return spectrum
         for angle in angles:
             spectrum = torch.maximum(spectrum, gaussian_func_symmetric(angle, sigma)).cpu()
         return spectrum
-    
+
     def data_preprocess(self, mic_sig_batch=None, targets_batch=None, eps=1e-6):
         data = []
         if mic_sig_batch is not None:
             mic_sig_batch = mic_sig_batch.to(self.dev, non_blocking=True)
             stft = self.dostft(signal=mic_sig_batch)
-            nb,nf,nt,nc = stft.shape
+            nb, nf, nt, nc = stft.shape
             stft = stft.permute(0, 3, 1, 2)
             stft_rebatch = stft.to(self.dev)
             nb, nc, nf, nt = stft_rebatch.shape
             mag = torch.abs(stft_rebatch)
-            mean_value = torch.mean(mag.reshape(mag.shape[0],-1), dim = 1)
-            mean_value = mean_value[:,np.newaxis,np.newaxis,np.newaxis].expand(mag.shape)
+            mean_value = torch.mean(mag.reshape(mag.shape[0], -1), dim=1)
+            mean_value = mean_value[:, np.newaxis, np.newaxis, np.newaxis].expand(mag.shape)
             stft_rebatch_real = torch.real(stft_rebatch) / (mean_value + eps)
             stft_rebatch_image = torch.imag(stft_rebatch) / (mean_value + eps)
             real_image_batch = torch.cat(
                 (stft_rebatch_real, stft_rebatch_image), dim=1)
             data += [real_image_batch[:, :, self.fre_range_used, :]]
             data += [targets_batch]
-        return data 
-    
+        return data
+
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.arch.parameters(), lr=0.0005)
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.975, last_epoch=-1)
@@ -280,8 +290,8 @@ class MyModel(LightningModule):
             'lr_scheduler': {
                 'scheduler': lr_scheduler,
                 'monitor': 'valid/loss',
+                }
             }
-        }
 
 
 class MyCLI(LightningCLI):
@@ -300,7 +310,7 @@ class MyCLI(LightningCLI):
             "early_stopping.min_delta": 0.01,
             "early_stopping.patience": 100,
             "early_stopping.mode": "min",
-        })
+            })
 
         parser.add_lightning_class_args(ModelCheckpoint, "model_checkpoint")
         model_checkpoint_defaults = {
@@ -311,7 +321,7 @@ class MyCLI(LightningCLI):
             "model_checkpoint.save_top_k": 1,
             "model_checkpoint.auto_insert_metric_name": False,
             "model_checkpoint.save_last": True
-        }
+            }
         parser.set_defaults(model_checkpoint_defaults)
 
         # RichProgressBar
@@ -329,16 +339,16 @@ class MyCLI(LightningCLI):
             "progress_bar.console_kwargs": {
                 "force_terminal": True,
                 "no_color": False,
-                "width": 200,  
-            }
-        })
+                "width": 200,
+                }
+            })
 
         # LearningRateMonitor
         parser.add_lightning_class_args(
             LearningRateMonitor, "learning_rate_monitor")
         learning_rate_monitor_defaults = {
             "learning_rate_monitor.logging_interval": "epoch",
-        }
+            }
         parser.set_defaults(learning_rate_monitor_defaults)
 
     def before_fit(self):
@@ -360,12 +370,22 @@ class MyCLI(LightningCLI):
                     save_dir=save_dir,
                     log_model=True,
                     )
+                try:
+                    if isinstance(self.trainer.logger, WandbLogger):
+                        _ = self.trainer.logger.experiment  # forces wandb.init()
+                        print("W&B run URL:", getattr(self.trainer.logger.experiment, "url", "(no url yet)"))
+                except Exception as e:
+                    print("W&B init error:", repr(e))
             else:
                 self.trainer.logger = TensorBoardLogger(
                     save_dir=save_dir, name="", version=version, default_hp_metric=False)
+            print("Logger in use:", type(self.trainer.logger).__name__)
+
+
         else:
             model_name = type(self.model).__name__
-            base_log_dir = r'D:\SSL_logs'
+            # inside before_fit
+            base_log_dir = _norm(os.environ.get("LOG_ROOT", r"D:/SSL_logs"))
             os.makedirs(base_log_dir, exist_ok=True)
             if use_wandb:
                 self.trainer.logger = WandbLogger(
@@ -375,9 +395,18 @@ class MyCLI(LightningCLI):
                     save_dir=base_log_dir,
                     log_model=True,
                     )
+                # >>> force wandb.init() and print the link
+                try:
+                    exp = self.trainer.logger.experiment
+                    print("W&B run URL:", getattr(exp, "url", "(no url yet)"))
+                except Exception as e:
+                    print("W&B init error:", repr(e))
             else:
                 self.trainer.logger = TensorBoardLogger(
                     base_log_dir, name=model_name, default_hp_metric=False)
+
+            # print which logger we ended up with
+            print("Logger in use:", type(self.trainer.logger).__name__)
 
     def before_test(self):
         torch.set_num_interop_threads(5)
@@ -413,8 +442,8 @@ if __name__ == '__main__':
     cli = MyCLI(
         MyModel,
         MyDataModule,
-        seed_everything_default=2, 
+        seed_everything_default=2,
         save_config_callback=SaveConfigCallback,
         save_config_kwargs={'overwrite': True},
-        #parser_kwargs={"parser_mode": "omegaconf"},
-    )
+        # parser_kwargs={"parser_mode": "omegaconf"},
+        )
