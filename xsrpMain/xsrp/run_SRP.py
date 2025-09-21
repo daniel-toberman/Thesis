@@ -10,19 +10,26 @@ import soundfile as sf
 import matplotlib.pyplot as plt
 import re
 
-from SSL.utils_ import audiowu_high_array_geometry
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..', 'SSL'))
+from utils_ import audiowu_high_array_geometry
 
 # === CONFIG (defaults; can override with CLI) ===
 # === CONFIG (defaults; can override with CLI) ===
-BASE_DIR = r"D:\RealMAN\extracted\test\ma_noisy_speech"
-CSV_PATH = r"D:\RealMAN\test\test_static_source_location.csv"
+BASE_DIR = "/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted"
+CSV_PATH = "/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/test/test_static_source_location_08.csv"
 
-USE_MIC_ID = [1, 2, 3, 4, 5, 6, 7, 8, 0]
+USE_MIC_ID = [0, 1, 2, 3, 4, 5, 6, 7, 8]
 MIC_POSITIONS = audiowu_high_array_geometry()[USE_MIC_ID, :2]
 SRP_GRID_CELLS = 360
-SRP_MODE = "gcc_phat_time"   # or "gcc_phat_freq"
-N_AVG_SAMPLES = 3
+SRP_MODE = "gcc_phat_freq"   # Try frequency domain - often more robust
+N_AVG_SAMPLES = 10          # Increase averaging for better stability
 N_DFT_BINS = 2048
+
+# Debug: Print array info
+print(f"Microphone positions (m):\n{MIC_POSITIONS}")
+print(f"Array diameter: {np.max(np.linalg.norm(MIC_POSITIONS, axis=1)) * 2:.3f}m")
 
 # Local imports
 from xsrpMain.xsrp.conventional_srp import ConventionalSrp
@@ -34,18 +41,18 @@ from xsrpMain.visualization.cross_correlation import plot_cross_correlation as p
 
 
 
-USE_MIC_ID = [1, 2, 3, 4, 5, 6, 7, 8, 0]
+USE_MIC_ID = [0, 1, 2, 3, 4, 5, 6, 7, 8]
 
-def load_segment_multichannel(flac_ch1_path: Path, st: int, ed: int, use_mic_id=USE_MIC_ID):
+def load_segment_multichannel(wav_ch1_path: Path, st: int, ed: int, use_mic_id=USE_MIC_ID):
     """
-    Loads a multichannel segment from files named ..._CH{N}.flac.
-    Accepts either a base path ending with .flac or a CH1 path like *_CH1.flac.
+    Loads a multichannel segment from files named ..._CH{N}.wav.
+    Accepts either a base path ending with .wav or a CH1 path like *_CH1.wav.
     Returns: fs (int), X with shape (channels, samples) as float64.
     """
-    p = str(flac_ch1_path)
+    p = str(wav_ch1_path)
     channels = []
     for i in use_mic_id:
-        temp_path = p.replace('.flac', f'_CH{i}.flac')
+        temp_path = p.replace('.wav', f'_CH{i}.wav')
         if i == 0:
             info = sf.info(temp_path)
             fs_ref = info.samplerate
@@ -117,8 +124,11 @@ def process_row(row, idx, plots: bool, outdir: Path | None, save_cc: bool, save_
             except: gt = None
             break
 
-    flac_path = os.path.join(BASE_DIR, rel)
-    fs, X = load_segment_multichannel(flac_path, st, ed)
+    # Convert .flac to .wav if needed
+    if rel.endswith('.flac'):
+        rel = rel.replace('.flac', '.wav')
+    wav_path = os.path.join(BASE_DIR, rel)
+    fs, X = load_segment_multichannel(wav_path, st, ed)
     if X.shape[0] != MIC_POSITIONS.shape[0]:
         return {"idx": idx, "filename": rel, "status": f"error: mic count mismatch ({X.shape[0]} vs {MIC_POSITIONS.shape[0]})"}
 
