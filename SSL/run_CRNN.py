@@ -149,11 +149,12 @@ class MyModel(LightningModule):
 
     def on_train_start(self):
         if self.current_epoch == 0:
-            if self.trainer.is_global_zero and hasattr(self.logger, 'log_dir') and 'notag' not in self.hparams.exp_name:
+            # Only log git status and model for TensorBoard logger (which has log_dir)
+            if self.trainer.is_global_zero and hasattr(self.logger, 'log_dir') and self.logger.log_dir and 'notag' not in self.hparams.exp_name:
                 tag_and_log_git_status(self.logger.log_dir + '/git.out', self.logger.version,
                     self.hparams.exp_name, model_name=type(self).__name__)
 
-            if self.trainer.is_global_zero and hasattr(self.logger, 'log_dir'):
+            if self.trainer.is_global_zero and hasattr(self.logger, 'log_dir') and self.logger.log_dir:
                 with open(self.logger.log_dir + '/model.txt', 'a') as f:
                     f.write(str(self))
                     f.write('\n\n\n')
@@ -298,10 +299,14 @@ class MyCLI(LightningCLI):
     def add_arguments_to_parser(self, parser: LightningArgumentParser) -> None:
         from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
 
-        parser.set_defaults(
-            {"trainer.strategy": "ddp"})
-        parser.set_defaults({"trainer.accelerator": "gpu"})
-        parser.add_argument("--use_wandb", type=bool, default=False)
+        # Use appropriate strategy based on available hardware
+        if torch.backends.mps.is_available():
+            parser.set_defaults({"trainer.strategy": "auto", "trainer.accelerator": "mps"})
+        elif torch.cuda.is_available():
+            parser.set_defaults({"trainer.strategy": "ddp", "trainer.accelerator": "gpu"})
+        else:
+            parser.set_defaults({"trainer.strategy": "auto", "trainer.accelerator": "cpu"})
+        parser.add_argument("--use_wandb", action="store_true", default=False)
         parser.add_argument("--wandb_project", type=str, default="SSL-CRNN")
         parser.add_argument("--wandb_entity", type=str, default=None)  # optional team/org
         parser.add_lightning_class_args(EarlyStopping, "early_stopping")
@@ -344,7 +349,9 @@ class MyCLI(LightningCLI):
 
     def before_fit(self):
         resume_from_checkpoint: str = self.config['fit']['ckpt_path']
-        use_wandb = bool(self.config.get('use_wandb', False))
+        # Fix: wandb config is nested under 'fit'
+        use_wandb = bool(self.config.get('fit', {}).get('use_wandb', False))
+
 
         if resume_from_checkpoint is not None and resume_from_checkpoint.endswith('last.ckpt'):
             resume_from_checkpoint = os.path.normpath(resume_from_checkpoint)
@@ -355,8 +362,8 @@ class MyCLI(LightningCLI):
             if use_wandb:
                 # W&B can resume to the same run if you pass id, but simplest is: new run, same name
                 self.trainer.logger = WandbLogger(
-                    project=self.config.get("wandb_project", "SSL-CRNN"),
-                    entity=self.config.get("wandb_entity", None),
+                    project=self.config.get('fit', {}).get("wandb_project", "SSL-CRNN"),
+                    entity=self.config.get('fit', {}).get("wandb_entity", None),
                     name=f"{type(self.model).__name__}-v{version}",
                     save_dir=save_dir,
                     log_model=True,
@@ -380,8 +387,8 @@ class MyCLI(LightningCLI):
             os.makedirs(base_log_dir, exist_ok=True)
             if use_wandb:
                 self.trainer.logger = WandbLogger(
-                    project=self.config.get("wandb_project", "SSL-CRNN"),
-                    entity=self.config.get("wandb_entity", None),
+                    project=self.config.get('fit', {}).get("wandb_project", "SSL-CRNN"),
+                    entity=self.config.get('fit', {}).get("wandb_entity", None),
                     name=self.model.hparams.exp_name if hasattr(self.model, "hparams") else "exp",
                     save_dir=base_log_dir,
                     log_model=True,
