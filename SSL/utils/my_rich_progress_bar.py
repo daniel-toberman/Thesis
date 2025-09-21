@@ -25,6 +25,37 @@ class MyRichProgressBar(RichProgressBar):
             )
         super().__init__(*args, **kwargs)
 
+    def _init_progress(self, trainer):
+        """Override to safely handle console initialization"""
+        try:
+            super()._init_progress(trainer)
+        except (IndexError, AttributeError):
+            # Initialize progress manually if needed
+            from rich.progress import Progress, TaskID
+            if not hasattr(self, 'progress') or self.progress is None:
+                self.progress = Progress()
+                self.main_progress_task_id = self.progress.add_task("Training", total=100)
+
+    def on_validation_batch_start(self, trainer, pl_module, batch, batch_idx, dataloader_idx=0):
+        """Override to safely handle progress assertion"""
+        if hasattr(self, 'progress') and self.progress is not None:
+            super().on_validation_batch_start(trainer, pl_module, batch, batch_idx, dataloader_idx)
+
+    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
+        """Override to safely handle progress assertion"""
+        if hasattr(self, 'progress') and self.progress is not None:
+            super().on_validation_batch_end(trainer, pl_module, outputs, batch, batch_idx, dataloader_idx)
+
+    def on_train_batch_start(self, trainer, pl_module, batch, batch_idx):
+        """Override to safely handle progress assertion"""
+        if hasattr(self, 'progress') and self.progress is not None:
+            super().on_train_batch_start(trainer, pl_module, batch, batch_idx)
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        """Override to safely handle progress assertion"""
+        if hasattr(self, 'progress') and self.progress is not None:
+            super().on_train_batch_end(trainer, pl_module, outputs, batch, batch_idx)
+
     def on_validation_end(self, trainer: Trainer, pl_module):
         super().on_validation_end(trainer, pl_module)
         sys.stdout.flush()

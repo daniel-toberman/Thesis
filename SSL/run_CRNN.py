@@ -35,10 +35,10 @@ def _norm(p: str) -> str:
     return p.replace("\\", "/").rstrip("/")
 
 
-DATA_ROOT = _norm(os.environ.get("DATA_ROOT", r"D:/RealMAN_filtered/extracted/"))
+DATA_ROOT = _norm(os.environ.get("DATA_ROOT", r"/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted"))
 CSV_ROOT = _norm(
-    os.environ.get("CSV_ROOT", r"D:/RealMAN_filtered"))  # where the CSVs live (we also copied CSVs into the partition)
-NOISE_ROOT = _norm(os.environ.get("NOISE_ROOT", r"D:/RealMAN_filtered/extracted"))
+    os.environ.get("CSV_ROOT", r"/Users/danieltoberman/Documents/RealMAN_dataset_T60_08"))  # where the CSVs live (we also copied CSVs into the partition)
+NOISE_ROOT = _norm(os.environ.get("NOISE_ROOT", r"/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted"))
 
 dataset_train = RealData(
     data_dir=f"{DATA_ROOT}/",
@@ -119,7 +119,7 @@ class MyModel(LightningModule):
             max_num_sources: int = 1,
             return_metric: bool = True,
             compile: bool = False,
-            device: str = 'cuda',
+            device: str = 'mps' if torch.backends.mps.is_available() else 'cuda' if torch.cuda.is_available() else 'cpu',
             exp_name: str = 'exp',
             ):
         super().__init__()
@@ -191,10 +191,10 @@ class MyModel(LightningModule):
             gt_batch[0] = gt_batch[0][:, :pred_batch.shape[1], :]
             gt_batch[1] = gt_batch[1][:, :pred_batch.shape[1], :]
         loss = self.cal_cls_loss(pred_batch=pred_batch, gt_batch=gt_batch)
-        self.log("valid/loss", loss, sync_dist=True)
+        self.log("valid/loss", loss, sync_dist=True, prog_bar=True)
         metric = self.get_metric(pred_batch=pred_batch, gt_batch=gt_batch, idx=None, tar_type='spect')
         for m in metric:
-            self.log('valid/' + m, metric[m].item(), sync_dist=True)
+            self.log('valid/' + m, metric[m].item(), sync_dist=True, prog_bar=True)
 
     def test_step(self, batch: Tensor, batch_idx: int):
         mic_sig_batch = batch[0]
@@ -232,7 +232,7 @@ class MyModel(LightningModule):
     def cal_cls_loss(self, pred_batch=None, gt_batch=None):
         doa_batch = gt_batch[0]
         vad_batch = gt_batch[1]
-        doa_batch = doa_batch[:, :, :].type(torch.LongTensor).cuda()
+        doa_batch = doa_batch[:, :, :].type(torch.LongTensor).to(self.dev)
         nb, nt, _ = pred_batch.shape
         new_target_batch = torch.zeros(nb, nt, self.res_phi)
         for b in range(nb):
@@ -324,23 +324,14 @@ class MyCLI(LightningCLI):
             }
         parser.set_defaults(model_checkpoint_defaults)
 
-        # RichProgressBar
+        # TQDMProgressBar (simpler alternative)
+        from pytorch_lightning.callbacks import TQDMProgressBar
         parser.add_lightning_class_args(
-            RichProgressBar, nested_key='progress_bar')
+            TQDMProgressBar, nested_key='progress_bar')
         parser.set_defaults({
-            "progress_bar.theme.description": "bold cyan",
-            "progress_bar.theme.progress_bar": "green",
-            "progress_bar.theme.progress_bar_finished": "green",
-            "progress_bar.theme.progress_bar_pulse": "cyan",
-            "progress_bar.theme.batch_progress": "green",
-            "progress_bar.theme.time": "grey82",
-            "progress_bar.theme.processing_speed": "grey82",
-            "progress_bar.theme.metrics": "grey82",
-            "progress_bar.console_kwargs": {
-                "force_terminal": True,
-                "no_color": False,
-                "width": 200,
-                }
+            "progress_bar.refresh_rate": 1,
+            "progress_bar.leave": False,
+            "progress_bar.process_position": 0,
             })
 
         # LearningRateMonitor
@@ -385,7 +376,7 @@ class MyCLI(LightningCLI):
         else:
             model_name = type(self.model).__name__
             # inside before_fit
-            base_log_dir = _norm(os.environ.get("LOG_ROOT", r"D:/SSL_logs"))
+            base_log_dir = _norm(os.environ.get("LOG_ROOT", r"SSL_logs"))
             os.makedirs(base_log_dir, exist_ok=True)
             if use_wandb:
                 self.trainer.logger = WandbLogger(

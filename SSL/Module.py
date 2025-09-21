@@ -515,7 +515,7 @@ class PredDOA(nn.Module):
             nfft=512,
             ch_mode='M',
             mic_location=np.array((((-0.08, 0.0, 0.0), (-0.04, 0.0, 0.0), (0.04, 0.0, 0.0), (0.08, 0.0, 0.0),))),
-            device='cuda',
+            device='mps' if torch.backends.mps.is_available() else 'cuda' if torch.cuda.is_available() else 'cpu',
             ):
         super(PredDOA, self).__init__()
         self.nfft = nfft

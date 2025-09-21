@@ -42,6 +42,14 @@ On windows:
 python SSL\run_CRNN.py fit --trainer.devices=auto --trainer.accelerator=gpu --trainer.precision=16-mixed --trainer.strategy=auto --trainer.max_epochs=50
 python SSL\run_IPDnet.py fit --trainer.devices=auto --trainer.accelerator=gpu --trainer.precision=16-mixed --trainer.strategy=auto --trainer.max_epochs=50
 
+on mac:
+fit
+--trainer.devices=1
+--trainer.accelerator=mps
+--trainer.precision=16-mixed
+--trainer.strategy=auto
+--trainer.max_epochs=50
+
 weights and biases:
 python SSL\run_CRNN.py fit --trainer.devices=auto --trainer.accelerator=gpu --trainer.precision=16-mixed --trainer.strategy=auto --trainer.max_epochs=50 --use_wandb true --wandb_project SSL-CRNN
 

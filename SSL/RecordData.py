@@ -179,10 +179,10 @@ class RealData(Dataset):
             if fs != self.target_fs:
                 mic_signal = self.resample(mic_signal=mic_signal, fs=fs, new_fs=self.target_fs)
             len_signal = mic_signal.shape[0] / self.target_fs
-            # pading or cut the source signal
+            # padding or cut the source signal
             if len_signal <= self.wav_use_len:
                 input_length = int(self.wav_use_len * self.target_fs)
-                input_mic_signal = np.zeros((input_length, mic_signal.shape[1]))
+                input_mic_signal = np.zeros((input_length, mic_signal.shape[1]), dtype=np.float32)
                 min_length = min(input_length, mic_signal.shape[0])
                 input_mic_signal[:min_length, :] = mic_signal[:min_length, :]
                 dp_vad_temp = self.cal_vad(dp_signal)
@@ -270,7 +270,7 @@ class RealData(Dataset):
             # print(new_mic_signal.shape,labels.to(torch.float32).shape,vad_source.to(torch.float32).shape)
             array_topo = self.pos_mics[use_mic_id_item]
             # print(dp_vad)
-            return input_mic_signal, targets.to(torch.float32), dp_vad.to(torch.float32), array_topo
+            return input_mic_signal.astype(np.float32), targets.to(torch.float32), dp_vad.to(torch.float32), array_topo.astype(np.float32)
 
 
         else:
@@ -299,7 +299,7 @@ class RealData(Dataset):
             if len_signal < self.wav_use_len:
                 input_length = int(self.wav_use_len * self.target_fs)
 
-                input_mic_signal = np.zeros((input_length, mic_signal.shape[1]))
+                input_mic_signal = np.zeros((input_length, mic_signal.shape[1]), dtype=np.float32)
 
                 min_length = min(input_length, mic_signal.shape[0])
 
@@ -354,4 +354,4 @@ class RealData(Dataset):
 
             array_topo = self.pos_mics[use_mic_id_item]
 
-            return input_mic_signal, targets.to(torch.float32), dp_vad.to(torch.float32), array_topo
+            return input_mic_signal.astype(np.float32), targets.to(torch.float32), dp_vad.to(torch.float32), array_topo.astype(np.float32)
