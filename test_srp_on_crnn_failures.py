@@ -53,11 +53,7 @@ def load_worst_cases():
 def get_audio_file_for_example(dataset_name, example_idx):
     """
     Map dataset example indices to actual audio files.
-    This is a simplified mapping - in practice you'd need proper index tracking.
     """
-
-    # This is a placeholder - you'll need to map example_idx to actual filenames
-    # For now, we'll use the CSV files to get the mapping
 
     if dataset_name == 'test':
         csv_path = "/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/test/test_static_source_location_08.csv"
@@ -66,19 +62,27 @@ def get_audio_file_for_example(dataset_name, example_idx):
 
     try:
         df = pd.read_csv(csv_path)
-        # Approximate mapping - this assumes batch_size and ordering
-        # In practice, you'd need exact tracking from the dataloader
 
         if example_idx < len(df):
             row = df.iloc[example_idx]
             filename = str(row['filename']).replace('\\', '/')
+
+            # Convert from .flac to .wav and remove extension for base name
             if filename.endswith('.flac'):
-                filename = filename.replace('.flac', '.wav')
+                base_filename = filename.replace('.flac', '')
+            elif filename.endswith('.wav'):
+                base_filename = filename.replace('.wav', '')
+            else:
+                base_filename = filename
 
+            # Construct path to base audio file (without channel suffix)
             base_dir = "/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted"
-            audio_path = os.path.join(base_dir, filename)
+            base_audio_path = os.path.join(base_dir, base_filename)
 
-            return audio_path, row['real_st'], row['real_ed'], row.get('angle', row.get('target_angle', 0))
+            # Get angle - try different column names
+            angle = row.get('angle(°)', row.get('angle', row.get('target_angle', 0)))
+
+            return base_audio_path, row['real_st'], row['real_ed'], angle
         else:
             return None, None, None, None
 
@@ -86,38 +90,40 @@ def get_audio_file_for_example(dataset_name, example_idx):
         print(f"Error mapping example {example_idx}: {e}")
         return None, None, None, None
 
-def load_multichannel_audio(audio_path, start_sample, end_sample):
-    """Load multichannel audio for SRP processing."""
-
-    if not os.path.exists(audio_path):
-        print(f"Audio file not found: {audio_path}")
-        return None, None
+def load_multichannel_audio(base_audio_path, wav_use_len=4, target_fs=16000):
+    """Load multichannel audio for SRP processing, using first 4 seconds like CRNN test."""
 
     try:
         # Load all channels
         channels = []
         for mic_id in USE_MIC_ID:
-            ch_path = audio_path.replace('.wav', f'_CH{mic_id}.wav')
+            # Construct channel-specific file path
+            ch_path = f"{base_audio_path}_CH{mic_id}.wav"
+
             if not os.path.exists(ch_path):
                 print(f"Channel file not found: {ch_path}")
                 return None, None
 
             signal, fs = sf.read(ch_path, dtype="float64")
 
-            # Extract segment
-            if end_sample <= len(signal):
-                signal_segment = signal[start_sample:end_sample]
+            # Use first 4 seconds like CRNN test (mimicking RecordData validation logic)
+            target_len_samples = int(wav_use_len * fs)
+
+            if len(signal) >= target_len_samples:
+                signal_segment = signal[:target_len_samples]
             else:
-                signal_segment = signal[start_sample:]
+                # If shorter than 4s, use entire signal
+                signal_segment = signal
 
             channels.append(signal_segment)
 
         # Stack channels (C, T) format
         multichannel_signal = np.stack(channels, axis=0)
+        print(f"  Loaded {len(channels)} channels, segment length: {multichannel_signal.shape[1]} samples ({multichannel_signal.shape[1]/fs:.2f}s)")
         return multichannel_signal, fs
 
     except Exception as e:
-        print(f"Error loading audio {audio_path}: {e}")
+        print(f"Error loading audio {base_audio_path}: {e}")
         return None, None
 
 def run_srp_on_signal(multichannel_signal, fs):
@@ -175,8 +181,8 @@ def test_srp_on_failures():
             print(f"  Could not map to audio file")
             continue
 
-        # Load audio
-        multichannel_signal, fs = load_multichannel_audio(audio_path, int(start_sample), int(end_sample))
+        # Load audio (use first 4 seconds like CRNN test)
+        multichannel_signal, fs = load_multichannel_audio(audio_path)
         if multichannel_signal is None:
             continue
 

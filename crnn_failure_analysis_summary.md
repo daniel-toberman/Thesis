@@ -10,6 +10,13 @@ Analysis of 3,582 examples reveals CRNN achieves excellent overall performance (
 - **Excellent Cases**: 96.0% have <10° error
 - **Failure Cases**: Only 0.98% have >20° error, but these can be severe (up to 101°)
 
+### Comparative Analysis: CRNN vs SRP-PHAT
+- **CRNN Excellence**: Rarely fails (0.98% >20° error)
+- **SRP Excellence**: Rarely excels (2% <2° error on random samples)
+
+### Validated Research Findings
+- ✅ **T60 Generalization**: CRNN handles T60 up to 4.9 with only 0.11° degradation
+
 ### Systematic Failure Patterns
 
 #### Pattern 1: 137° Prediction Bias
@@ -60,10 +67,28 @@ Analysis of 3,582 examples reveals CRNN achieves excellent overall performance (
 2. **Do classical methods help in failure cases?** Test SRP-PHAT on the 35 worst examples
 3. **What causes systematic biases?** Analyze audio characteristics of 137° and 1° prediction cases
 
+### Extended Research Directions
+
+#### Out-of-Distribution Testing
+4. **Novel Noise Types**: Test CRNN on different noise types (not SNR changes) while keeping T60 < 0.8
+   - Current training: Uses specific noise from RealMAN dataset
+   - **Research Question**: Does CRNN fail with unseen noise types where SRP remains robust?
+   - **Hypothesis**: Classical methods may be more noise-agnostic than neural networks
+
+5. **Reverberation Robustness - VALIDATED**: ✅ **COMPLETED ANALYSIS**
+   - **Experiment**: Tested T60 < 0.8 trained model on full test set (T60 up to 4.9)
+   - **Results**: 4.76° MAE vs 4.65° MAE (only 0.11° degradation)
+   - **Conclusion**: CRNN shows excellent T60 generalization - **T60 is NOT a viable hybrid differentiator**
+   - **High T60 test coverage**: 49.8% of full test set includes T60 ≥ 0.8
+   - **Extreme cases**: Successfully handled T60 = 4.9 (UndergroundParking2)
+
+6. **Cross-Domain Robustness**: Evaluate on different acoustic environments
+   - Test trained model on entirely different room types/sizes
+   - Assess if SRP's physics-based approach provides better generalization
+
 ### Technical Investigations
-1. **Acoustic Analysis**: What makes 100-120° region difficult for CRNN?
 2. **Uncertainty Quantification**: Can CRNN confidence scores predict failures?
-3. **Classical Method Performance**: How does SRP-PHAT perform on the 35 failure cases?
+5. **Complementary Failure Modes**: **PRIMARY FOCUS** - Find noise-based scenarios where CRNN fails but SRP succeeds
 
 ## Implementation Strategy
 
@@ -81,6 +106,15 @@ Analysis of 3,582 examples reveals CRNN achieves excellent overall performance (
 - Implement region-based switching logic
 - Test on full dataset with hybrid approach
 - Measure improvement in worst-case performance
+
+### Phase 4: Out-of-Distribution Robustness Testing
+- **Novel Noise Experiment**: Create test sets with different noise types
+  - Urban noise (traffic, construction) vs original dataset noise
+  - Industrial noise (machinery, fans) vs original noise
+  - Natural noise (wind, rain) vs original noise
+  - **Key**: Same SNR levels, different noise characteristics
+- **Cross-Environment Testing**: Test on recordings from different room acoustics
+- **Degradation Analysis**: Compare CRNN vs SRP performance degradation curves
 
 ## Expected Contributions
 
