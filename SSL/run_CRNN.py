@@ -52,27 +52,30 @@ def get_noise_dir_for_dataset(dataset_type, use_novel_noise=False, novel_noise_s
         # For novel noise, always use high T60 noise from full dataset
         return f"/Users/danieltoberman/Documents/RealMAN_9_channels/extracted/train/ma_noise/{novel_noise_scene}/"
 
-def create_datasets(use_novel_noise=False, novel_noise_scene="BadmintonCourt1"):
+def create_datasets(use_novel_noise=False, novel_noise_scene="BadmintonCourt1", novel_noise_snr=5.0):
     """Create datasets with appropriate noise directories."""
 
     dataset_train = RealData(
         data_dir=f"{DATA_ROOT}/",
         target_dir=[f"{CSV_ROOT}/train/train_static_source_location_08.csv"],
-        noise_dir=get_noise_dir_for_dataset("train", use_novel_noise, novel_noise_scene)
+        noise_dir=get_noise_dir_for_dataset("train", use_novel_noise, novel_noise_scene),
+        novel_noise_snr=novel_noise_snr if use_novel_noise else 5.0
     )
 
     dataset_val = RealData(
         data_dir=f"{DATA_ROOT}/",
         target_dir=[f"{CSV_ROOT}/val/val_static_source_location_08.csv"],
         noise_dir=get_noise_dir_for_dataset("val", use_novel_noise, novel_noise_scene),
-        on_the_fly=use_novel_noise  # Enable noise only when using novel noise
+        on_the_fly=use_novel_noise,  # Enable noise only when using novel noise
+        novel_noise_snr=novel_noise_snr if use_novel_noise else None
     )
 
     dataset_test = RealData(
         data_dir=f"{DATA_ROOT}/",
         target_dir=[f"{CSV_ROOT}/test/test_static_source_location_08.csv"],
         noise_dir=get_noise_dir_for_dataset("test", use_novel_noise, novel_noise_scene),
-        on_the_fly=use_novel_noise  # Enable noise only when using novel noise
+        on_the_fly=use_novel_noise,  # Enable noise only when using novel noise
+        novel_noise_snr=novel_noise_snr if use_novel_noise else None
     )
 
     return dataset_train, dataset_val, dataset_test
@@ -88,11 +91,11 @@ class MyDataModule(LightningDataModule):
         self.num_workers = num_workers
         self.batch_size = batch_size
 
-    def update_datasets(self, use_novel_noise=False, novel_noise_scene="BadmintonCourt1"):
+    def update_datasets(self, use_novel_noise=False, novel_noise_scene="BadmintonCourt1", novel_noise_snr=5.0):
         """Update datasets with novel noise settings."""
         global dataset_train, dataset_val, dataset_test
-        dataset_train, dataset_val, dataset_test = create_datasets(use_novel_noise, novel_noise_scene)
-        print(f"Updated datasets - Novel noise: {use_novel_noise}, Scene: {novel_noise_scene}")
+        dataset_train, dataset_val, dataset_test = create_datasets(use_novel_noise, novel_noise_scene, novel_noise_snr)
+        print(f"Updated datasets - Novel noise: {use_novel_noise}, Scene: {novel_noise_scene}, SNR: {novel_noise_snr} dB")
 
     def prepare_data(self) -> None:
         return super().prepare_data()
@@ -167,6 +170,9 @@ class MyModel(LightningModule):
             win_len=win_len, win_shift_ratio=win_shift_ratio, nfft=nfft)
         self.fre_range_used = range(1, int(self.nfft / 2) + 1, 1)
         self.get_metric = at_module.PredDOA()
+
+        # List to collect individual predictions during testing
+        self.test_predictions = []
         self.dev = device
         self.res_phi = res_phi
 
@@ -223,6 +229,39 @@ class MyModel(LightningModule):
         for m in metric:
             self.log('valid/' + m, metric[m].item(), sync_dist=True, prog_bar=True)
 
+    def extract_individual_predictions(self, pred_batch, gt_batch, batch_idx):
+        """Extract individual DOA predictions for each sample in the batch."""
+        predictions = []
+
+        for b_idx in range(pred_batch.shape[0]):  # For each sample in batch
+            # Get prediction and ground truth for this sample
+            pred_sample = pred_batch[b_idx:b_idx+1]  # Keep batch dimension
+            gt_sample = [gt_batch[0][b_idx:b_idx+1], gt_batch[1][b_idx:b_idx+1]]
+
+            # Find the peak in the prediction (simple DOA estimation)
+            # Average over time dimension and find argmax
+            pred_avg = torch.mean(pred_sample, dim=1)  # [1, 360]
+            pred_angle_idx = torch.argmax(pred_avg, dim=1)  # [1]
+            pred_angle = pred_angle_idx.float()  # Convert to degrees directly
+
+            # Extract ground truth angle (raw angle values, not one-hot)
+            # gt_sample[0] shape is [1, time, 1] containing raw angle values
+            gt_angle = gt_sample[0][0, 0, 0].float()  # Take first timestep, first angle value
+
+            # Calculate absolute error
+            error = torch.abs((pred_angle - gt_angle + 180) % 360 - 180)
+
+            predictions.append({
+                'batch_idx': batch_idx,
+                'sample_idx': b_idx,
+                'pred_angle': pred_angle.item(),
+                'gt_angle': gt_angle.item(),
+                'abs_error': error.item(),
+                'global_idx': batch_idx * pred_batch.shape[0] + b_idx  # Global sample index
+            })
+
+        return predictions
+
     def test_step(self, batch: Tensor, batch_idx: int):
         mic_sig_batch = batch[0]
         targets_batch = batch[1]
@@ -237,12 +276,51 @@ class MyModel(LightningModule):
             gt_batch[0] = gt_batch[0][:, :pred_batch.shape[1], :]
             gt_batch[1] = gt_batch[1][:, :pred_batch.shape[1], :]
             # print(pred_batch.shape)
+
+        # Extract individual predictions and add to collection
+        individual_preds = self.extract_individual_predictions(pred_batch, gt_batch, batch_idx)
+        self.test_predictions.extend(individual_preds)
+
         loss = self.cal_cls_loss(pred_batch=pred_batch, gt_batch=gt_batch)
         self.log("test/loss", loss, sync_dist=True)
         metric = self.get_metric(pred_batch=pred_batch, gt_batch=gt_batch, idx=batch_idx, tar_type='spect')
         for m in metric:
             self.log('test/' + m, metric[m].item(), sync_dist=True)
             # self.log('test2/'+m, metric2[m].item(), sync_dist=True)
+
+    def on_test_epoch_end(self):
+        """Save individual predictions to CSV file at the end of testing."""
+        if self.test_predictions:
+            import pandas as pd
+            import os
+
+            # Create predictions DataFrame
+            df = pd.DataFrame(self.test_predictions)
+
+            # Create output directory if it doesn't exist
+            output_dir = "crnn_predictions"
+            os.makedirs(output_dir, exist_ok=True)
+
+            # Generate filename with timestamp or scene info
+            global USE_NOVEL_NOISE, NOVEL_NOISE_SCENE
+            if USE_NOVEL_NOISE:
+                filename = f"crnn_predictions_{NOVEL_NOISE_SCENE}.csv"
+            else:
+                filename = "crnn_predictions_clean.csv"
+
+            output_path = os.path.join(output_dir, filename)
+            df.to_csv(output_path, index=False)
+
+            # Print summary statistics
+            total_cases = len(df)
+            cases_over_30 = len(df[df['abs_error'] > 30])
+            mean_error = df['abs_error'].mean()
+
+            print(f"\n=== CRNN Individual Predictions Saved ===")
+            print(f"Saved {total_cases} predictions to: {output_path}")
+            print(f"Mean Absolute Error: {mean_error:.2f}°")
+            print(f"Cases with >30° error: {cases_over_30} ({cases_over_30/total_cases*100:.1f}%)")
+            print(f"Cases with ≤30° error: {total_cases-cases_over_30} ({(total_cases-cases_over_30)/total_cases*100:.1f}%)")
 
     def predict_step(self, batch, batch_idx: int):
         data_batch = self.data_preprocess(mic_sig_batch=batch.permute(0, 2, 1))
@@ -340,6 +418,8 @@ class MyCLI(LightningCLI):
         parser.add_argument("--novel_noise_scene", type=str, default="BadmintonCourt1",
                           choices=["BadmintonCourt1", "Cafeteria2", "ShoppingMall", "SunkenPlaza2"],
                           help="High T60 scene to use for novel noise")
+        parser.add_argument("--novel_noise_snr", type=float, default=5.0,
+                          help="SNR in dB for novel noise addition (default: 5.0)")
         parser.add_lightning_class_args(EarlyStopping, "early_stopping")
         parser.set_defaults({
             "early_stopping.monitor": "valid/loss",
@@ -444,10 +524,12 @@ class MyCLI(LightningCLI):
         # Handle novel noise settings for testing
         use_novel_noise = self.config.get('test', {}).get('use_novel_noise', False)
         novel_noise_scene = self.config.get('test', {}).get('novel_noise_scene', 'BadmintonCourt1')
+        novel_noise_snr = self.config.get('test', {}).get('novel_noise_snr', 5.0)
 
         if use_novel_noise:
             print(f"Using novel noise from scene: {novel_noise_scene}")
-            self.datamodule.update_datasets(use_novel_noise, novel_noise_scene)
+            print(f"Novel noise SNR: {novel_noise_snr} dB")
+            self.datamodule.update_datasets(use_novel_noise, novel_noise_scene, novel_noise_snr)
 
         if self.config['test']['ckpt_path'] != None:
             ckpt_path = self.config['test']['ckpt_path']

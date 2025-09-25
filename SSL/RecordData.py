@@ -24,7 +24,7 @@ def _label_key_from(sig_path: str) -> str:
 
 class RealData(Dataset):
     def __init__(self, data_dir, target_dir, noise_dir, input_fs=16000, use_mic_id=[1, 2, 3, 4, 5, 6, 7, 8, 0],
-            target_fs=16000, snr=[-10, 15], wav_use_len=4, on_the_fly=True, is_variable_array=False):
+            target_fs=16000, snr=[-10, 15], wav_use_len=4, on_the_fly=True, is_variable_array=False, novel_noise_snr=5.0):
         self.ends = 'CH1.wav'
 
         self.data_paths = []
@@ -47,6 +47,7 @@ class RealData(Dataset):
         self.is_varibale_array = is_variable_array
         self.on_the_fly = on_the_fly
         self.use_mic_id = use_mic_id
+        self.novel_noise_snr = novel_noise_snr
 
     def __len__(self):
         return len(self.data_paths)
@@ -183,7 +184,7 @@ class RealData(Dataset):
             # sf.write('./dp_sig/' + str(idx)+'.wav',dp_signal,samplerate=self.target_fs)
 
             # snr_item = rng.uniform(self.SNR[0], self.SNR[1])
-            snr_item = 5
+            snr_item = self.novel_noise_snr
             mic_signal, fs = self.load_signals(sig_path, use_mic_id=use_mic_id_item)
             if fs != self.target_fs:
                 mic_signal = self.resample(mic_signal=mic_signal, fs=fs, new_fs=self.target_fs)

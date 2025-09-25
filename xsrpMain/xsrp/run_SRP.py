@@ -18,6 +18,7 @@ from utils_ import audiowu_high_array_geometry
 # Novel noise settings - will be set by command line arguments
 USE_NOVEL_NOISE = False
 NOVEL_NOISE_SCENE = "BadmintonCourt1"
+NOVEL_NOISE_SNR = 5.0
 NOVEL_NOISE_ROOT = "/Users/danieltoberman/Documents/RealMAN_9_channels/extracted/train/ma_noise"
 
 # === CONFIG (defaults; can override with CLI) ===
@@ -106,7 +107,7 @@ def load_novel_noise(scene_name, target_length, fs, example_idx=0):
 
     return np.stack(noise_channels, axis=0)
 
-def add_novel_noise_to_signal(signal, fs, example_idx, snr_db=5):
+def add_novel_noise_to_signal(signal, fs, example_idx, snr_db=5.0):
     """Add novel noise to clean signal at specified SNR."""
     target_length = signal.shape[1]
     noise = load_novel_noise(NOVEL_NOISE_SCENE, target_length, fs, example_idx)
@@ -143,9 +144,9 @@ def load_segment_multichannel(wav_ch1_path: Path, st: int, ed: int, example_idx=
     X = np.stack(channels, axis=0)
 
     # Add novel noise if enabled
-    global USE_NOVEL_NOISE
+    global USE_NOVEL_NOISE, NOVEL_NOISE_SNR
     if USE_NOVEL_NOISE:
-        X = add_novel_noise_to_signal(X, fs_ref, example_idx)
+        X = add_novel_noise_to_signal(X, fs_ref, example_idx, snr_db=NOVEL_NOISE_SNR)
 
     return fs_ref, X
 
@@ -239,7 +240,7 @@ def process_row(row, idx, plots: bool, outdir: Path | None, save_cc: bool, save_
     }
 
 def main():
-    global CSV_PATH, BASE_DIR, USE_NOVEL_NOISE, NOVEL_NOISE_SCENE
+    global CSV_PATH, BASE_DIR, USE_NOVEL_NOISE, NOVEL_NOISE_SCENE, NOVEL_NOISE_SNR
     p = argparse.ArgumentParser()
     p.add_argument("--csv", default=CSV_PATH)
     p.add_argument("--base-dir", default=BASE_DIR)
@@ -259,15 +260,19 @@ def main():
     p.add_argument("--novel_noise_scene", type=str, default="BadmintonCourt1",
                   choices=["BadmintonCourt1", "Cafeteria2", "ShoppingMall", "SunkenPlaza2"],
                   help="High T60 scene to use for novel noise")
+    p.add_argument("--novel_noise_snr", type=float, default=5.0,
+                  help="SNR in dB for novel noise addition (default: 5.0)")
 
     args = p.parse_args()
 
     # Set global novel noise settings
     USE_NOVEL_NOISE = args.use_novel_noise
     NOVEL_NOISE_SCENE = args.novel_noise_scene
+    NOVEL_NOISE_SNR = args.novel_noise_snr
 
     if USE_NOVEL_NOISE:
         print(f"Using novel noise from scene: {NOVEL_NOISE_SCENE}")
+        print(f"Novel noise SNR: {NOVEL_NOISE_SNR} dB")
         print(f"Noise source: {os.path.join(NOVEL_NOISE_ROOT, NOVEL_NOISE_SCENE)}")
 
 
