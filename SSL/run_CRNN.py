@@ -229,8 +229,8 @@ class MyModel(LightningModule):
         for m in metric:
             self.log('valid/' + m, metric[m].item(), sync_dist=True, prog_bar=True)
 
-    def extract_individual_predictions(self, pred_batch, gt_batch, batch_idx):
-        """Extract individual DOA predictions for each sample in the batch."""
+    def extract_individual_predictions(self, pred_batch, gt_batch, batch_idx, logits_batch=None):
+        """Extract individual DOA predictions with confidence metrics for each sample in the batch."""
         predictions = []
 
         for b_idx in range(pred_batch.shape[0]):  # For each sample in batch
@@ -251,14 +251,42 @@ class MyModel(LightningModule):
             # Calculate absolute error
             error = torch.abs((pred_angle - gt_angle + 180) % 360 - 180)
 
-            predictions.append({
+            # Extract confidence metrics
+            confidence_metrics = {}
+            if logits_batch is not None:
+                logits_sample = logits_batch[b_idx:b_idx+1]  # [1, T, 360]
+                logits_avg = torch.mean(logits_sample, dim=1)  # [1, 360]
+
+                # Convert to probabilities for confidence calculation
+                probs_avg = torch.softmax(logits_avg, dim=1)  # [1, 360]
+
+                # Confidence metrics
+                confidence_metrics['max_prob'] = torch.max(probs_avg).item()
+                confidence_metrics['entropy'] = (-probs_avg * torch.log(probs_avg + 1e-10)).sum().item()
+                confidence_metrics['prediction_variance'] = torch.var(probs_avg).item()
+
+                # Peak sharpness - ratio of max to second max
+                sorted_probs, _ = torch.sort(probs_avg, descending=True)
+                confidence_metrics['peak_sharpness'] = (sorted_probs[0, 0] / (sorted_probs[0, 1] + 1e-10)).item()
+
+                # Concentration around prediction (sum of probabilities in ±10° window)
+                pred_idx = pred_angle_idx.item()
+                window_size = 10
+                window_indices = [(pred_idx + i) % 360 for i in range(-window_size, window_size + 1)]
+                confidence_metrics['local_concentration'] = probs_avg[0, window_indices].sum().item()
+
+            prediction_dict = {
                 'batch_idx': batch_idx,
                 'sample_idx': b_idx,
                 'pred_angle': pred_angle.item(),
                 'gt_angle': gt_angle.item(),
                 'abs_error': error.item(),
                 'global_idx': batch_idx * pred_batch.shape[0] + b_idx  # Global sample index
-            })
+            }
+
+            # Add confidence metrics to the dictionary
+            prediction_dict.update(confidence_metrics)
+            predictions.append(prediction_dict)
 
         return predictions
 
@@ -269,16 +297,21 @@ class MyModel(LightningModule):
         data_batch = self.data_preprocess(mic_sig_batch, targets_batch=targets_batch)
         in_batch = data_batch[0]
         gt_batch = [data_batch[1], vad_batch]
-        pred_batch = self(in_batch)
+
+        # Get both predictions and logits for confidence calculation
+        logits_batch, _ = self.arch.forward_with_intermediates(in_batch)
+        pred_batch = torch.sigmoid(logits_batch)  # Apply sigmoid to get probabilities
+
         if pred_batch.shape[1] > gt_batch[0].shape[1]:
             pred_batch = pred_batch[:, :gt_batch[0].shape[1], :]
+            logits_batch = logits_batch[:, :gt_batch[0].shape[1], :]
         else:
             gt_batch[0] = gt_batch[0][:, :pred_batch.shape[1], :]
             gt_batch[1] = gt_batch[1][:, :pred_batch.shape[1], :]
             # print(pred_batch.shape)
 
-        # Extract individual predictions and add to collection
-        individual_preds = self.extract_individual_predictions(pred_batch, gt_batch, batch_idx)
+        # Extract individual predictions with confidence metrics
+        individual_preds = self.extract_individual_predictions(pred_batch, gt_batch, batch_idx, logits_batch)
         self.test_predictions.extend(individual_preds)
 
         loss = self.cal_cls_loss(pred_batch=pred_batch, gt_batch=gt_batch)
@@ -304,9 +337,9 @@ class MyModel(LightningModule):
             # Generate filename with timestamp or scene info
             global USE_NOVEL_NOISE, NOVEL_NOISE_SCENE
             if USE_NOVEL_NOISE:
-                filename = f"crnn_predictions_{NOVEL_NOISE_SCENE}.csv"
+                filename = f"crnn_predictions_with_confidence_{NOVEL_NOISE_SCENE}.csv"
             else:
-                filename = "crnn_predictions_clean.csv"
+                filename = "crnn_predictions_with_confidence_clean.csv"
 
             output_path = os.path.join(output_dir, filename)
             df.to_csv(output_path, index=False)
