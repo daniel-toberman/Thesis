@@ -23,9 +23,9 @@ CSV_PATH = "/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/test/test_sta
 USE_MIC_ID = [0, 1, 2, 3, 4, 5, 6, 7, 8]
 MIC_POSITIONS = audiowu_high_array_geometry()[USE_MIC_ID, :2]
 SRP_GRID_CELLS = 360
-SRP_MODE = "gcc_phat_freq"   # Try frequency domain - often more robust
-N_AVG_SAMPLES = 10          # Increase averaging for better stability
-N_DFT_BINS = 2048
+SRP_MODE = "gcc_phat_time"   # Try time domain - might be better for small arrays
+N_AVG_SAMPLES = 100         # Even more averaging for stability
+N_DFT_BINS = 1024           # Smaller DFT for faster processing
 
 # Debug: Print array info
 print(f"Microphone positions (m):\n{MIC_POSITIONS}")
@@ -68,12 +68,12 @@ def run_srp_return_details(fs: int, mic_signals: np.ndarray):
     srp = ConventionalSrp(
         fs=fs,
         grid_type="doa_1D",
-        n_grid_cells=SRP_GRID_CELLS,
+        n_grid_cells=720,  # Higher resolution - 0.5 degree steps
         mic_positions=MIC_POSITIONS,
         room_dims=None,
-        mode=SRP_MODE,
+        mode="gcc_phat_freq",  # Back to frequency domain
         interpolation=True,
-        n_average_samples=N_AVG_SAMPLES,
+        n_average_samples=200,  # Even more averaging
         n_dft_bins=N_DFT_BINS
     )
     est_vec, srp_map, grid = srp.forward(mic_signals)

@@ -4,3 +4,7 @@ SSL/__pycache__/
 SSL/utils/__pycache__/
 
 SSL/SSL_logs/
+
+results/
+
+SSL_logs/
