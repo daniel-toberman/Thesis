@@ -8,3 +8,7 @@ SSL/SSL_logs/
 results/
 
 SSL_logs/
+
+xsrpMain/xsrp/__pycache__/
+
+08_CRNN/best/

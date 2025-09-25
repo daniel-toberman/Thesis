@@ -15,6 +15,11 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..', 'SSL'))
 from utils_ import audiowu_high_array_geometry
 
+# Novel noise settings - will be set by command line arguments
+USE_NOVEL_NOISE = False
+NOVEL_NOISE_SCENE = "BadmintonCourt1"
+NOVEL_NOISE_ROOT = "/Users/danieltoberman/Documents/RealMAN_9_channels/extracted/train/ma_noise"
+
 # === CONFIG (defaults; can override with CLI) ===
 # === CONFIG (defaults; can override with CLI) ===
 BASE_DIR = "/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted"
@@ -43,7 +48,82 @@ from xsrpMain.visualization.cross_correlation import plot_cross_correlation as p
 
 USE_MIC_ID = [0, 1, 2, 3, 4, 5, 6, 7, 8]
 
-def load_segment_multichannel(wav_ch1_path: Path, st: int, ed: int, use_mic_id=USE_MIC_ID):
+def load_novel_noise(scene_name, target_length, fs, example_idx=0):
+    """Load novel noise from high T60 scene for testing generalization.
+    Uses example_idx to ensure reproducible noise selection for comparison."""
+    scene_noise_dir = os.path.join(NOVEL_NOISE_ROOT, scene_name)
+
+    # Get list of available noise files (sorted for reproducibility)
+    noise_files = []
+    if os.path.exists(scene_noise_dir):
+        for root, dirs, files in os.walk(scene_noise_dir):
+            # Look for .high_CH0.wav pattern in novel noise files
+            noise_files.extend([os.path.join(root, f) for f in files if f.endswith('_CH0.wav')])
+        noise_files = sorted(noise_files)  # Ensure deterministic order
+
+    if not noise_files:
+        print(f"Warning: No noise files found in {scene_noise_dir}")
+        return np.zeros((len(USE_MIC_ID), target_length))
+
+    # Select noise file based on example index for reproducibility
+    noise_idx = example_idx % len(noise_files)
+    selected_noise = noise_files[noise_idx]
+    # Handle both .high_CH0.wav and _CH0.wav patterns
+    if '.high_CH0.wav' in selected_noise:
+        base_path = selected_noise.replace('.high_CH0.wav', '.high')
+    else:
+        base_path = selected_noise.replace('_CH0.wav', '')
+
+    # Use example-specific seed for segment selection
+    rng = np.random.default_rng(42 + example_idx)
+
+    # Load all channels of the selected noise
+    noise_channels = []
+    for i in USE_MIC_ID:
+        noise_ch_path = f"{base_path}_CH{i}.wav"
+        if os.path.exists(noise_ch_path):
+            noise_signal, noise_fs = sf.read(noise_ch_path, dtype="float64")
+
+            # Resample if necessary
+            if noise_fs != fs:
+                from scipy import signal as scipy_signal
+                noise_signal = scipy_signal.resample(noise_signal, int(len(noise_signal) * fs / noise_fs))
+
+            # Extract reproducible segment based on example index
+            if len(noise_signal) >= target_length:
+                start_idx = rng.integers(0, len(noise_signal) - target_length + 1)
+                noise_segment = noise_signal[start_idx:start_idx + target_length]
+            else:
+                # Repeat if noise is shorter
+                repeats = int(np.ceil(target_length / len(noise_signal)))
+                noise_repeated = np.tile(noise_signal, repeats)
+                noise_segment = noise_repeated[:target_length]
+
+            noise_channels.append(noise_segment)
+        else:
+            # If channel doesn't exist, use zeros
+            noise_channels.append(np.zeros(target_length))
+
+    return np.stack(noise_channels, axis=0)
+
+def add_novel_noise_to_signal(signal, fs, example_idx, snr_db=5):
+    """Add novel noise to clean signal at specified SNR."""
+    target_length = signal.shape[1]
+    noise = load_novel_noise(NOVEL_NOISE_SCENE, target_length, fs, example_idx)
+
+    # Calculate SNR coefficient
+    signal_power = np.mean(signal ** 2)
+    noise_power = np.mean(noise ** 2)
+
+    if signal_power == 0 or noise_power == 0:
+        return signal
+
+    noise_coeff = np.sqrt(signal_power / noise_power * np.power(10, -snr_db / 10))
+    noisy_signal = signal + noise_coeff * noise
+
+    return noisy_signal
+
+def load_segment_multichannel(wav_ch1_path: Path, st: int, ed: int, example_idx=0, use_mic_id=USE_MIC_ID):
     """
     Loads a multichannel segment from files named ..._CH{N}.wav.
     Accepts either a base path ending with .wav or a CH1 path like *_CH1.wav.
@@ -61,6 +141,12 @@ def load_segment_multichannel(wav_ch1_path: Path, st: int, ed: int, use_mic_id=U
 
     # SRP expects (C, T)
     X = np.stack(channels, axis=0)
+
+    # Add novel noise if enabled
+    global USE_NOVEL_NOISE
+    if USE_NOVEL_NOISE:
+        X = add_novel_noise_to_signal(X, fs_ref, example_idx)
+
     return fs_ref, X
 
 
@@ -128,14 +214,15 @@ def process_row(row, idx, plots: bool, outdir: Path | None, save_cc: bool, save_
     if rel.endswith('.flac'):
         rel = rel.replace('.flac', '.wav')
     wav_path = os.path.join(BASE_DIR, rel)
-    fs, X = load_segment_multichannel(wav_path, st, ed)
+    fs, X = load_segment_multichannel(wav_path, st, ed, example_idx=idx)  # Pass example index for reproducible noise
     if X.shape[0] != MIC_POSITIONS.shape[0]:
         return {"idx": idx, "filename": rel, "status": f"error: mic count mismatch ({X.shape[0]} vs {MIC_POSITIONS.shape[0]})"}
 
     az, srp_obj, srp_map, grid = run_srp_return_details(fs, X)
     err = angular_error_deg(az, gt) if gt is not None else None
 
-    print(f"[{idx}] {rel} -> {az:.1f}°" + (f" (gt {gt:.1f}°, err {err:.1f}°)" if gt is not None else ""))
+    noise_info = f" + novel noise from {NOVEL_NOISE_SCENE}" if USE_NOVEL_NOISE else ""
+    print(f"[{idx}] {rel} -> {az:.1f}°" + (f" (gt {gt:.1f}°, err {err:.1f}°)" if gt is not None else "") + noise_info)
 
     if plots:
         outdir and outdir.mkdir(parents=True, exist_ok=True)
@@ -152,7 +239,7 @@ def process_row(row, idx, plots: bool, outdir: Path | None, save_cc: bool, save_
     }
 
 def main():
-    global CSV_PATH, BASE_DIR
+    global CSV_PATH, BASE_DIR, USE_NOVEL_NOISE, NOVEL_NOISE_SCENE
     p = argparse.ArgumentParser()
     p.add_argument("--csv", default=CSV_PATH)
     p.add_argument("--base-dir", default=BASE_DIR)
@@ -166,7 +253,22 @@ def main():
     p.add_argument("--random", action="store_true", help="Pick rows at random")
     p.add_argument("--seed", type=int, default=0, help="RNG seed for --random")
 
+    # Novel noise arguments
+    p.add_argument("--use_novel_noise", action="store_true", default=False,
+                  help="Use novel noise from high T60 environments for testing generalization")
+    p.add_argument("--novel_noise_scene", type=str, default="BadmintonCourt1",
+                  choices=["BadmintonCourt1", "Cafeteria2", "ShoppingMall", "SunkenPlaza2"],
+                  help="High T60 scene to use for novel noise")
+
     args = p.parse_args()
+
+    # Set global novel noise settings
+    USE_NOVEL_NOISE = args.use_novel_noise
+    NOVEL_NOISE_SCENE = args.novel_noise_scene
+
+    if USE_NOVEL_NOISE:
+        print(f"Using novel noise from scene: {NOVEL_NOISE_SCENE}")
+        print(f"Noise source: {os.path.join(NOVEL_NOISE_ROOT, NOVEL_NOISE_SCENE)}")
 
 
     CSV_PATH = args.csv; BASE_DIR = args.base_dir

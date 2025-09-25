@@ -40,25 +40,45 @@ CSV_ROOT = _norm(
     os.environ.get("CSV_ROOT", r"/Users/danieltoberman/Documents/RealMAN_dataset_T60_08"))  # where the CSVs live (we also copied CSVs into the partition)
 NOISE_ROOT = _norm(os.environ.get("NOISE_ROOT", r"/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted"))
 
-dataset_train = RealData(
-    data_dir=f"{DATA_ROOT}/",
-    target_dir=[f"{CSV_ROOT}/train/train_static_source_location_08.csv"],
-    noise_dir=f"{NOISE_ROOT}/train/ma_noise/"
+# Global variables for novel noise - will be set by CLI
+USE_NOVEL_NOISE = False
+NOVEL_NOISE_SCENE = "BadmintonCourt1"
+
+def get_noise_dir_for_dataset(dataset_type, use_novel_noise=False, novel_noise_scene="BadmintonCourt1"):
+    """Get appropriate noise directory based on novel noise settings."""
+    if not use_novel_noise:
+        return f"{NOISE_ROOT}/{dataset_type}/ma_noise/"
+    else:
+        # For novel noise, always use high T60 noise from full dataset
+        return f"/Users/danieltoberman/Documents/RealMAN_9_channels/extracted/train/ma_noise/{novel_noise_scene}/"
+
+def create_datasets(use_novel_noise=False, novel_noise_scene="BadmintonCourt1"):
+    """Create datasets with appropriate noise directories."""
+
+    dataset_train = RealData(
+        data_dir=f"{DATA_ROOT}/",
+        target_dir=[f"{CSV_ROOT}/train/train_static_source_location_08.csv"],
+        noise_dir=get_noise_dir_for_dataset("train", use_novel_noise, novel_noise_scene)
     )
 
-dataset_val = RealData(
-    data_dir=f"{DATA_ROOT}/",
-    target_dir=[f"{CSV_ROOT}/val/val_static_source_location_08.csv"],
-    noise_dir=f"{NOISE_ROOT}/val/ma_noise/",
-    on_the_fly=False
+    dataset_val = RealData(
+        data_dir=f"{DATA_ROOT}/",
+        target_dir=[f"{CSV_ROOT}/val/val_static_source_location_08.csv"],
+        noise_dir=get_noise_dir_for_dataset("val", use_novel_noise, novel_noise_scene),
+        on_the_fly=use_novel_noise  # Enable noise only when using novel noise
     )
 
-dataset_test = RealData(
-    data_dir=f"{DATA_ROOT}/",
-    target_dir=[f"{CSV_ROOT}/test/test_static_source_location_08.csv"],
-    noise_dir=f"{NOISE_ROOT}/test/ma_noise/",
-    on_the_fly=False
+    dataset_test = RealData(
+        data_dir=f"{DATA_ROOT}/",
+        target_dir=[f"{CSV_ROOT}/test/test_static_source_location_08.csv"],
+        noise_dir=get_noise_dir_for_dataset("test", use_novel_noise, novel_noise_scene),
+        on_the_fly=use_novel_noise  # Enable noise only when using novel noise
     )
+
+    return dataset_train, dataset_val, dataset_test
+
+# Initialize with default settings (will be updated by CLI)
+dataset_train, dataset_val, dataset_test = create_datasets()
 
 
 class MyDataModule(LightningDataModule):
@@ -67,6 +87,12 @@ class MyDataModule(LightningDataModule):
         super().__init__()
         self.num_workers = num_workers
         self.batch_size = batch_size
+
+    def update_datasets(self, use_novel_noise=False, novel_noise_scene="BadmintonCourt1"):
+        """Update datasets with novel noise settings."""
+        global dataset_train, dataset_val, dataset_test
+        dataset_train, dataset_val, dataset_test = create_datasets(use_novel_noise, novel_noise_scene)
+        print(f"Updated datasets - Novel noise: {use_novel_noise}, Scene: {novel_noise_scene}")
 
     def prepare_data(self) -> None:
         return super().prepare_data()
@@ -309,6 +335,11 @@ class MyCLI(LightningCLI):
         parser.add_argument("--use_wandb", action="store_true", default=False)
         parser.add_argument("--wandb_project", type=str, default="SSL-CRNN")
         parser.add_argument("--wandb_entity", type=str, default=None)  # optional team/org
+        parser.add_argument("--use_novel_noise", action="store_true", default=False,
+                          help="Use novel noise from high T60 environments for testing generalization")
+        parser.add_argument("--novel_noise_scene", type=str, default="BadmintonCourt1",
+                          choices=["BadmintonCourt1", "Cafeteria2", "ShoppingMall", "SunkenPlaza2"],
+                          help="High T60 scene to use for novel noise")
         parser.add_lightning_class_args(EarlyStopping, "early_stopping")
         parser.set_defaults({
             "early_stopping.monitor": "valid/loss",
@@ -409,6 +440,15 @@ class MyCLI(LightningCLI):
     def before_test(self):
         torch.set_num_interop_threads(5)
         torch.set_num_threads(5)
+
+        # Handle novel noise settings for testing
+        use_novel_noise = self.config.get('test', {}).get('use_novel_noise', False)
+        novel_noise_scene = self.config.get('test', {}).get('novel_noise_scene', 'BadmintonCourt1')
+
+        if use_novel_noise:
+            print(f"Using novel noise from scene: {novel_noise_scene}")
+            self.datamodule.update_datasets(use_novel_noise, novel_noise_scene)
+
         if self.config['test']['ckpt_path'] != None:
             ckpt_path = self.config['test']['ckpt_path']
         else:

@@ -26,6 +26,7 @@ class RealData(Dataset):
     def __init__(self, data_dir, target_dir, noise_dir, input_fs=16000, use_mic_id=[1, 2, 3, 4, 5, 6, 7, 8, 0],
             target_fs=16000, snr=[-10, 15], wav_use_len=4, on_the_fly=True, is_variable_array=False):
         self.ends = 'CH1.wav'
+
         self.data_paths = []
         self.all_targets = pd.DataFrame()
         for dir in target_dir:
@@ -165,8 +166,15 @@ class RealData(Dataset):
                 use_mic_id_item, _ = self.select_mic_array_no_circle(self.pos_mics, rng=rng)
             else:
                 use_mic_id_item = self.use_mic_id
-            # cal vad
-            dp_sig_path = sig_path.replace('/ma_speech/', '/dp_speech/')
+            # cal vad - handle both ma_speech and ma_noisy_speech paths
+            if '/ma_speech/' in sig_path:
+                dp_sig_path = sig_path.replace('/ma_speech/', '/dp_speech/')
+            elif '/ma_noisy_speech/' in sig_path:
+                dp_sig_path = sig_path.replace('/ma_noisy_speech/', '/dp_speech/')
+            else:
+                # Fallback: replace any ma_*_speech pattern
+                import re
+                dp_sig_path = re.sub(r'/ma_\w*_?speech/', '/dp_speech/', sig_path)
             dp_sig_path = dp_sig_path.replace('.flac', '.wav')
             dp_signal, dp_fs = sf.read(dp_sig_path, dtype="float32")
             if dp_fs != self.target_fs:
@@ -174,7 +182,8 @@ class RealData(Dataset):
             # print(dp_signal.shape)
             # sf.write('./dp_sig/' + str(idx)+'.wav',dp_signal,samplerate=self.target_fs)
 
-            snr_item = rng.uniform(self.SNR[0], self.SNR[1])
+            # snr_item = rng.uniform(self.SNR[0], self.SNR[1])
+            snr_item = 5
             mic_signal, fs = self.load_signals(sig_path, use_mic_id=use_mic_id_item)
             if fs != self.target_fs:
                 mic_signal = self.resample(mic_signal=mic_signal, fs=fs, new_fs=self.target_fs)
