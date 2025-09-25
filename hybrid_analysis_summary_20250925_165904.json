@@ -1,0 +1,8 @@
+{
+  "timestamp": "20250925_165904",
+  "total_dataset_size": 201,
+  "predicted_failures": 201,
+  "actual_failures_in_subset": 153,
+  "crnn_mae_on_subset": 97.76119402985074,
+  "crnn_success_rate": 23.880597014925375
+}
