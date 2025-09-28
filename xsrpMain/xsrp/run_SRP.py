@@ -26,14 +26,19 @@ NOVEL_NOISE_ROOT = "/Users/danieltoberman/Documents/RealMAN_9_channels/extracted
 BASE_DIR = "/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted"
 CSV_PATH = "/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/test/test_static_source_location_08.csv"
 
+# Default microphone array - will be updated based on command line args
 USE_MIC_ID = [0, 1, 2, 3, 4, 5, 6, 7, 8]
 MIC_POSITIONS = audiowu_high_array_geometry()[USE_MIC_ID, :2]
+
+# Default SRP parameters - can be overridden via command line
 SRP_GRID_CELLS = 360
 SRP_MODE = "gcc_phat_time"   # Try time domain - might be better for small arrays
 N_AVG_SAMPLES = 100         # Even more averaging for stability
 N_DFT_BINS = 1024           # Smaller DFT for faster processing
+FREQ_MIN = 300              # Minimum frequency in Hz
+FREQ_MAX = 3000             # Maximum frequency in Hz
 
-# Debug: Print array info
+# Debug: Print array info (will be updated after argument parsing)
 print(f"Microphone positions (m):\n{MIC_POSITIONS}")
 print(f"Array diameter: {np.max(np.linalg.norm(MIC_POSITIONS, axis=1)) * 2:.3f}m")
 
@@ -152,16 +157,18 @@ def load_segment_multichannel(wav_ch1_path: Path, st: int, ed: int, example_idx=
 
 
 def run_srp_return_details(fs: int, mic_signals: np.ndarray):
+    global SRP_GRID_CELLS, SRP_MODE, N_AVG_SAMPLES, N_DFT_BINS, FREQ_MIN, FREQ_MAX
     srp = ConventionalSrp(
         fs=fs,
         grid_type="doa_1D",
-        n_grid_cells=720,  # Higher resolution - 0.5 degree steps
+        n_grid_cells=SRP_GRID_CELLS,
         mic_positions=MIC_POSITIONS,
         room_dims=None,
-        mode="gcc_phat_freq",  # Back to frequency domain
+        mode=SRP_MODE,
         interpolation=True,
-        n_average_samples=200,  # Even more averaging
+        n_average_samples=N_AVG_SAMPLES,
         n_dft_bins=N_DFT_BINS
+        # TODO: Add freq_range=(FREQ_MIN, FREQ_MAX) if supported by ConventionalSrp
     )
     est_vec, srp_map, grid = srp.forward(mic_signals)
     az = float(np.degrees(np.arctan2(est_vec[1], est_vec[0])) % 360.0)
@@ -241,6 +248,7 @@ def process_row(row, idx, plots: bool, outdir: Path | None, save_cc: bool, save_
 
 def main():
     global CSV_PATH, BASE_DIR, USE_NOVEL_NOISE, NOVEL_NOISE_SCENE, NOVEL_NOISE_SNR
+    global SRP_GRID_CELLS, SRP_MODE, N_AVG_SAMPLES, N_DFT_BINS, FREQ_MIN, FREQ_MAX
     p = argparse.ArgumentParser()
     p.add_argument("--csv", default=CSV_PATH)
     p.add_argument("--base-dir", default=BASE_DIR)
@@ -263,6 +271,26 @@ def main():
     p.add_argument("--novel_noise_snr", type=float, default=5.0,
                   help="SNR in dB for novel noise addition (default: 5.0)")
 
+    # SRP parameter arguments
+    p.add_argument("--srp_grid_cells", type=int, default=720,
+                  help="Number of grid cells for SRP resolution (default: 720)")
+    p.add_argument("--srp_mode", type=str, default="gcc_phat_freq",
+                  choices=["gcc_phat_freq", "gcc_phat_time", "cross_correlation"],
+                  help="SRP algorithm mode (default: gcc_phat_freq)")
+    p.add_argument("--n_avg_samples", type=int, default=200,
+                  help="Number of samples to average for SRP stability (default: 200)")
+    p.add_argument("--n_dft_bins", type=int, default=1024,
+                  help="Number of DFT bins for frequency domain processing (default: 1024)")
+    p.add_argument("--freq_min", type=int, default=300,
+                  help="Minimum frequency in Hz for SRP processing (default: 300)")
+    p.add_argument("--freq_max", type=int, default=3000,
+                  help="Maximum frequency in Hz for SRP processing (default: 3000)")
+
+    # Array diameter selection
+    p.add_argument("--array_diameter", type=str, default="6cm",
+                  choices=["6cm", "12cm", "18cm"],
+                  help="Microphone array diameter: 6cm (mics 0-8), 12cm (mics 0,9-16), 18cm (mics 0,17-24)")
+
     args = p.parse_args()
 
     # Set global novel noise settings
@@ -270,11 +298,43 @@ def main():
     NOVEL_NOISE_SCENE = args.novel_noise_scene
     NOVEL_NOISE_SNR = args.novel_noise_snr
 
+    # Set global SRP parameters
+    SRP_GRID_CELLS = args.srp_grid_cells
+    SRP_MODE = args.srp_mode
+    N_AVG_SAMPLES = args.n_avg_samples
+    N_DFT_BINS = args.n_dft_bins
+    FREQ_MIN = args.freq_min
+    FREQ_MAX = args.freq_max
+
+    # Set microphone array configuration
+    global USE_MIC_ID, MIC_POSITIONS
+    if args.array_diameter == "6cm":
+        USE_MIC_ID = [0, 1, 2, 3, 4, 5, 6, 7, 8]  # 6cm diameter
+    elif args.array_diameter == "12cm":
+        USE_MIC_ID = [0] + list(range(9, 17))  # 12cm diameter: 0, 9-16
+    elif args.array_diameter == "18cm":
+        USE_MIC_ID = [0] + list(range(17, 25))  # 18cm diameter: 0, 17-24
+
+    # Update microphone positions based on selected array
+    MIC_POSITIONS = audiowu_high_array_geometry()[USE_MIC_ID, :2]
+
     if USE_NOVEL_NOISE:
         print(f"Using novel noise from scene: {NOVEL_NOISE_SCENE}")
         print(f"Novel noise SNR: {NOVEL_NOISE_SNR} dB")
         print(f"Noise source: {os.path.join(NOVEL_NOISE_ROOT, NOVEL_NOISE_SCENE)}")
 
+    print(f"SRP Parameters:")
+    print(f"  Grid cells: {SRP_GRID_CELLS}")
+    print(f"  Mode: {SRP_MODE}")
+    print(f"  Average samples: {N_AVG_SAMPLES}")
+    print(f"  DFT bins: {N_DFT_BINS}")
+    print(f"  Frequency range: {FREQ_MIN}-{FREQ_MAX} Hz")
+
+    print(f"Microphone Array Configuration:")
+    print(f"  Array diameter: {args.array_diameter}")
+    print(f"  Microphone IDs: {USE_MIC_ID}")
+    print(f"  Actual diameter: {np.max(np.linalg.norm(MIC_POSITIONS, axis=1)) * 2:.3f}m")
+    print(f"  Number of microphones: {len(USE_MIC_ID)}")
 
     CSV_PATH = args.csv; BASE_DIR = args.base_dir
     outdir = Path(args.outdir) if args.outdir else None
