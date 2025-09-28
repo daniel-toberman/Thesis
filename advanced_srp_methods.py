@@ -21,11 +21,24 @@ from datetime import datetime
 import soundfile as sf
 
 class AdvancedSRPProcessor:
-    def __init__(self, base_dir, test_csv="srp_predicted_failures_test.csv", limit=None):
+    def __init__(self, base_dir, test_csv="srp_predicted_failures_test.csv", limit=None, array_diameter="6cm"):
         self.base_dir = base_dir
         self.test_csv = test_csv
         self.limit = limit
+        self.array_diameter = array_diameter
         self.sample_rate = 16000
+
+        # Set microphone array based on diameter
+        if array_diameter == "6cm":
+            self.use_mic_id = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+        elif array_diameter == "12cm":
+            self.use_mic_id = [0] + list(range(9, 17))
+        elif array_diameter == "18cm":
+            self.use_mic_id = [0] + list(range(17, 25))
+        else:
+            raise ValueError(f"Unknown array diameter: {array_diameter}")
+
+        print(f"Using {array_diameter} microphone array (mics: {self.use_mic_id})")
 
     def load_audio_files(self):
         """Load audio files for the 201 failure cases."""
@@ -35,7 +48,7 @@ class AdvancedSRPProcessor:
         test_df = pd.read_csv(self.test_csv)
 
         audio_data = []
-        use_mic_id = [0, 1, 2, 3, 4, 5, 6, 7, 8]  # Same as in run_SRP
+        use_mic_id = self.use_mic_id  # Use configured microphone array
 
         for idx, row in test_df.iterrows():
             # Check limit
@@ -275,7 +288,8 @@ class AdvancedSRPProcessor:
                 '--csv', processed_csv_path,
                 '--base-dir', self.base_dir,
                 '--use_novel_noise',
-                '--novel_noise_scene', 'Cafeteria2'
+                '--novel_noise_scene', 'Cafeteria2',
+                '--array_diameter', self.array_diameter
             ]
 
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
@@ -375,7 +389,8 @@ class AdvancedSRPProcessor:
                 '--use_novel_noise',
                 '--novel_noise_scene', 'Cafeteria2',
                 '--srp_grid_cells', '1440',  # High resolution
-                '--n_avg_samples', '300'     # Good averaging
+                '--n_avg_samples', '300',     # Good averaging
+                '--array_diameter', self.array_diameter
             ]
 
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
@@ -449,7 +464,8 @@ class AdvancedSRPProcessor:
                 '--freq_max', str(variant['freq_range'][1]),
                 '--srp_mode', 'gcc_phat_freq' if variant['phat_beta'] > 0.5 else 'gcc_phat_time',
                 '--n_avg_samples', '400' if 'standard' in variant['name'] else '200',
-                '--srp_grid_cells', '1440'  # High resolution for better accuracy
+                '--srp_grid_cells', '1440',  # High resolution for better accuracy
+                '--array_diameter', self.array_diameter
             ]
 
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
@@ -624,13 +640,16 @@ def main():
                        help='CSV file with test cases')
     parser.add_argument('--limit', type=int, default=None,
                        help='Limit number of samples to test (for quick testing)')
+    parser.add_argument('--array_diameter', type=str, default="6cm",
+                       choices=["6cm", "12cm", "18cm"],
+                       help='Microphone array diameter: 6cm (mics 0-8), 12cm (mics 0,9-16), 18cm (mics 0,17-24)')
 
     args = parser.parse_args()
 
     print("ADVANCED SRP METHODS FOR FAILURE CASES")
     print("=" * 80)
 
-    processor = AdvancedSRPProcessor(args.base_dir, args.csv, args.limit)
+    processor = AdvancedSRPProcessor(args.base_dir, args.csv, args.limit, args.array_diameter)
 
     # Load audio data
     audio_data = processor.load_audio_files()

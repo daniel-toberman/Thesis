@@ -38,9 +38,6 @@ N_DFT_BINS = 1024           # Smaller DFT for faster processing
 FREQ_MIN = 300              # Minimum frequency in Hz
 FREQ_MAX = 3000             # Maximum frequency in Hz
 
-# Debug: Print array info (will be updated after argument parsing)
-print(f"Microphone positions (m):\n{MIC_POSITIONS}")
-print(f"Array diameter: {np.max(np.linalg.norm(MIC_POSITIONS, axis=1)) * 2:.3f}m")
 
 # Local imports
 from xsrpMain.xsrp.conventional_srp import ConventionalSrp
@@ -317,6 +314,9 @@ def main():
 
     # Update microphone positions based on selected array
     MIC_POSITIONS = audiowu_high_array_geometry()[USE_MIC_ID, :2]
+    # Debug: Print array info (will be updated after argument parsing)
+    print(f"Microphone positions (m):\n{MIC_POSITIONS}")
+    print(f"Array diameter: {np.max(np.linalg.norm(MIC_POSITIONS, axis=1)) * 2:.3f}m")
 
     if USE_NOVEL_NOISE:
         print(f"Using novel noise from scene: {NOVEL_NOISE_SCENE}")
