@@ -35,10 +35,10 @@ def _norm(p: str) -> str:
     return p.replace("\\", "/").rstrip("/")
 
 
-DATA_ROOT = _norm(os.environ.get("DATA_ROOT", r"/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted"))
+DATA_ROOT = _norm(os.environ.get("DATA_ROOT", r"/Users/danieltoberman/Documents/RealMAN_9_channels/extracted"))
 CSV_ROOT = _norm(
-    os.environ.get("CSV_ROOT", r"/Users/danieltoberman/Documents/RealMAN_dataset_T60_08"))  # where the CSVs live (we also copied CSVs into the partition)
-NOISE_ROOT = _norm(os.environ.get("NOISE_ROOT", r"/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted"))
+    os.environ.get("CSV_ROOT", r"/Users/danieltoberman/Documents/RealMAN_9_channels"))  # where the CSVs live (we also copied CSVs into the partition)
+NOISE_ROOT = _norm(os.environ.get("NOISE_ROOT", r"/Users/danieltoberman/Documents/RealMAN_9_channels/extracted"))
 
 # Global variables for novel noise - will be set by CLI
 USE_NOVEL_NOISE = False
@@ -72,7 +72,7 @@ def create_datasets(use_novel_noise=False, novel_noise_scene="BadmintonCourt1", 
 
     dataset_test = RealData(
         data_dir=f"{DATA_ROOT}/",
-        target_dir=[f"{CSV_ROOT}/test/test_static_source_location_08.csv"],
+        target_dir=[f"{CSV_ROOT}/test/test_static_source_location.csv"],
         noise_dir=get_noise_dir_for_dataset("test", use_novel_noise, novel_noise_scene),
         on_the_fly=use_novel_noise,  # Enable noise only when using novel noise
         novel_noise_snr=novel_noise_snr if use_novel_noise else None

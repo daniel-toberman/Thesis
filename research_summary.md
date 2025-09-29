@@ -1,9 +1,42 @@
-# CRNN vs SRP-PHAT: Failure Analysis & Hybrid Approach Opportunities
+# Hybrid Sound Source Localization: CRNN Failure Detection & Classical Method Fallback
+
+## What We Are Doing
+
+**Main Idea**: Develop a hybrid approach to sound source localization that combines neural networks (CRNN) with classical methods (SRP-PHAT). The goal is to identify cases where the neural network fails and automatically switch to classical methods that might perform better.
+
+**Training Setup**: We trained a CRNN on real-world data from the RealMAN dataset (not simulated data) using only low reverberation scenarios (T60 < 0.8 seconds). The network achieved excellent performance with low MAE (3.86°)on the original training distribution.
+
+## Key Experimental Progression
+
+### 1. T60 Generalization Test
+**Hypothesis**: Network would perform poorly on high reverberation data (T60 > 0.8) since it was only trained on T60 < 0.8.
+**Result**: Network achieved similar MAE performance 4.76° on full test dataset with T60 ranging up to 4.5 seconds, demonstrating excellent reverberation generalization.
+
+### 2. Out-of-Distribution Noise Test
+**Hypothesis**: Adding novel noise from unseen environments would degrade performance.
+**Setup**: Selected high-reverberation noise from T60 > 0.8 scenes (Cafeteria2) that the network had never seen during training, added at 5dB SNR.
+**Initial Result**: Network performance degraded to 14.98° MAE.
+**Critical Discovery**: After detailed investigation, only car gasoline and car electric cases brought performance down. The MAE from all other test environments remained excellent at ~6.31°.
+
+### 3. Failure Prediction Development
+**Approach**: Developed confidence-based failure prediction using CRNN's internal metrics (max probability, entropy, prediction variance, etc.).
+**Achievement**: Successfully predicted 80.1% of CRNN failures with 76.1% precision using simple threshold: max_prob ≤ 0.02560333.
+
+### 4. SRP Fallback Attempts
+**Challenge**: Tested SRP-PHAT on predicted failure cases but classical methods failed to rescue these challenging scenarios.
+**Optimization Attempts**:
+- Parameter tuning across 6 SRP parameters
+- Ensemble methods combining multiple SRP variants
+- Larger microphone arrays (12cm, 18cm vs 6cm baseline)
+- **Result**: All attempts failed - automotive + novel noise scenarios too acoustically challenging for classical methods
 
 ## Executive Summary
-Comprehensive analysis of 2009 test examples with novel noise reveals CRNN achieves excellent performance (14.98° MAE) but has **specific, predictable failure modes in automotive environments** that present clear opportunities for hybrid classical-neural approaches. Key discovery: 99.5% of CRNN failures (190/191 cases) occur specifically in automotive environments.
+This research demonstrates a systematic approach to neural-classical hybrid SSL, achieving breakthrough failure prediction (80.1% recall) but revealing that classical methods cannot rescue the specific failure modes of neural networks in automotive environments with novel noise. The work establishes the foundation for confidence-based hybrid systems while identifying the limits of classical method fallbacks.
 
 ## Key Findings
+
+### CRNN T60 Generalization Performance
+**CRNN demonstrates excellent reverberation time (T60) generalization**. The model was trained exclusively on data with T60 < 0.8 seconds but successfully generalizes to much higher reverberation conditions. Performance comparison shows nearly identical results between the original test set (T60 < 0.8s) and the extended T60 test set (T60 ranging up to 4.5 seconds), indicating robust acoustic generalization across diverse reverberation environments.
 
 ### Overall Performance Comparison (with Novel Noise - Cafeteria2, 5dB SNR)
 - **CRNN**: 14.98° MAE, vastly superior overall performance
@@ -246,6 +279,30 @@ python test_srp_on_predicted_failures.py ml
 **❌ Critical Issue - Unacceptable MAE**: 82.8° MAE is too high for practical use
 - Success rate improved but errors are massive when SRP fails
 - Need dramatic MAE reduction while maintaining success rate
+
+#### Microphone Array Diameter Investigation ✅ COMPLETED
+
+**Hypothesis**: Larger microphone arrays with better aperture might improve SRP performance on challenging failure cases, since CRNN was trained on 6cm array geometry.
+
+**Array Configurations Tested**:
+- **6cm diameter** (baseline): Microphones 0-8 (center + 8 outer)
+- **12cm diameter**: Microphones 0, 9-16 (center + 8 medium circle)
+- **18cm diameter**: Microphones 0, 17-24 (center + 8 large circle)
+
+**Results on 201 CRNN Failure Cases**:
+| Array Diameter | Success Rate (≤30°) | MAE | vs 6cm Baseline |
+|---------------|-------------------|-----|----------------|
+| **6cm** (baseline) | 15.9% | 91.2° | - |
+| **12cm** | 15.4% | 91.8° | -0.5% |
+| **18cm** | 15.4% | 91.7° | -0.5% |
+
+**❌ Key Finding**: Larger microphone arrays provide **no meaningful improvement**
+- Array size scaling 6cm → 12cm → 18cm shows essentially identical performance
+- Success rates remain around 15.4-15.9% across all array sizes
+- MAE stays consistently around 91-92° regardless of aperture
+- **3x larger array aperture cannot overcome acoustic interference from automotive+novel noise**
+
+**Technical Implication**: The automotive+novel noise scenario creates acoustic interference so severe that even dramatically improved spatial resolution and array aperture cannot rescue the challenging cases.
 
 ### Phase 5: Radical SRP Improvement 🔄 CURRENT PRIORITY
 **Goal**: Achieve acceptable MAE (<30°) while maintaining >25% success rate
