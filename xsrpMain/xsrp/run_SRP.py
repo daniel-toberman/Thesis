@@ -9,6 +9,7 @@ import pandas as pd
 import soundfile as sf
 import matplotlib.pyplot as plt
 import re
+from scipy import signal
 
 import sys
 import os
@@ -26,18 +27,16 @@ NOVEL_NOISE_ROOT = "/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extra
 BASE_DIR = "/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted"
 CSV_PATH = "/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/test/test_static_source_location_08.csv"
 
-# Default microphone array - will be updated based on command line args
-USE_MIC_ID = [0, 1, 2, 3, 4, 5, 6, 7, 8]
-MIC_POSITIONS = audiowu_high_array_geometry()[USE_MIC_ID, :2]
-
 # Default SRP parameters - can be overridden via command line
-SRP_GRID_CELLS = 360
+SRP_GRID_CELLS = 720
 SRP_MODE = "gcc_phat_freq"   # Try time domain - might be better for small arrays
-N_AVG_SAMPLES = 100         # Even more averaging for stability
-N_DFT_BINS = 1024           # Smaller DFT for faster processing
+N_AVG_SAMPLES = 10
+N_DFT_BINS = 2**12
 FREQ_MIN = 300              # Minimum frequency in Hz
 FREQ_MAX = 3000             # Maximum frequency in Hz
 
+# Bandpass filter settings
+FILTER_ORDER = 6            # Butterworth filter order
 
 # Local imports
 from xsrpMain.xsrp.conventional_srp import ConventionalSrp
@@ -48,10 +47,7 @@ from xsrpMain.xsrp.signal_features import cross_correlation as cc_raw
 from xsrpMain.visualization.cross_correlation import plot_cross_correlation as plot_cc  # viz util
 
 
-
-USE_MIC_ID = [0, 1, 2, 3, 4, 5, 6, 7, 8]
-
-def load_novel_noise(scene_name, target_length, fs, example_idx=0):
+def load_novel_noise(scene_name, target_length, fs, example_idx=0, use_mic_id=[0, 1, 2, 3, 4, 5, 6, 7, 8]):
     """Load novel noise from high T60 scene for testing generalization.
     Uses example_idx to ensure reproducible noise selection for comparison."""
     scene_noise_dir = os.path.join(NOVEL_NOISE_ROOT, scene_name)
@@ -66,7 +62,7 @@ def load_novel_noise(scene_name, target_length, fs, example_idx=0):
 
     if not noise_files:
         print(f"Warning: No noise files found in {scene_noise_dir}")
-        return np.zeros((len(USE_MIC_ID), target_length))
+        return np.zeros((len(use_mic_id), target_length))
 
     # Select noise file based on example index for reproducibility
     noise_idx = example_idx % len(noise_files)
@@ -82,7 +78,7 @@ def load_novel_noise(scene_name, target_length, fs, example_idx=0):
 
     # Load all channels of the selected noise
     noise_channels = []
-    for i in USE_MIC_ID:
+    for i in use_mic_id:
         noise_ch_path = f"{base_path}_CH{i}.wav"
         if os.path.exists(noise_ch_path):
             noise_signal, noise_fs = sf.read(noise_ch_path, dtype="float64")
@@ -109,10 +105,10 @@ def load_novel_noise(scene_name, target_length, fs, example_idx=0):
 
     return np.stack(noise_channels, axis=0)
 
-def add_novel_noise_to_signal(signal, fs, example_idx, snr_db=5.0):
+def add_novel_noise_to_signal(signal, fs, example_idx, snr_db=5.0, use_mic_id=[0, 1, 2, 3, 4, 5, 6, 7, 8]):
     """Add novel noise to clean signal at specified SNR."""
     target_length = signal.shape[1]
-    noise = load_novel_noise(NOVEL_NOISE_SCENE, target_length, fs, example_idx)
+    noise = load_novel_noise(NOVEL_NOISE_SCENE, target_length, fs, example_idx, use_mic_id)
 
     # Calculate SNR coefficient
     signal_power = np.mean(signal ** 2)
@@ -126,16 +122,67 @@ def add_novel_noise_to_signal(signal, fs, example_idx, snr_db=5.0):
 
     return noisy_signal
 
-def load_segment_multichannel(wav_ch1_path: Path, st: int, ed: int, example_idx=0, use_mic_id=USE_MIC_ID):
+def apply_bandpass_filter(multichannel_signal, fs, freq_min=300, freq_max=3000, order=6):
+    """Apply bandpass filter to multichannel signal for improved speech SSL performance.
+
+    Args:
+        multichannel_signal: np.ndarray with shape (channels, samples)
+        fs: sampling frequency in Hz
+        freq_min: minimum frequency in Hz (default: 300)
+        freq_max: maximum frequency in Hz (default: 3000)
+        order: filter order (default: 6)
+
+    Returns:
+        filtered_signal: np.ndarray with same shape as input
+    """
+    global ENABLE_BANDPASS, FILTER_ORDER
+
+    if not ENABLE_BANDPASS:
+        return multichannel_signal
+
+    # Ensure frequency bounds are valid
+    nyquist = fs / 2
+    if freq_max >= nyquist:
+        freq_max = nyquist * 0.95  # Use 95% of Nyquist to avoid edge effects
+
+    if freq_min <= 0:
+        freq_min = 10  # Avoid DC
+
+    if freq_min >= freq_max:
+        print(f"⚠️ Invalid filter range: {freq_min}-{freq_max}Hz, disabling bandpass")
+        return multichannel_signal
+
+    try:
+        # Design Butterworth bandpass filter
+        sos = signal.butter(order, [freq_min, freq_max], btype='band', fs=fs, output='sos')
+
+        # Apply filter to each channel
+        filtered_channels = []
+        for ch_idx in range(multichannel_signal.shape[0]):
+            filtered_ch = signal.sosfiltfilt(sos, multichannel_signal[ch_idx])
+            filtered_channels.append(filtered_ch)
+
+        filtered_signal = np.stack(filtered_channels, axis=0)
+
+        return filtered_signal
+
+    except Exception as e:
+        print(f"⚠️ Bandpass filter failed: {e}, using unfiltered signal")
+        return multichannel_signal
+
+def load_segment_multichannel(wav_ch1_path: Path, st: int, ed: int, example_idx=0, use_mic_id=[0, 1, 2, 3, 4, 5, 6, 7, 8]):
     """
     Loads a multichannel segment from files named ..._CH{N}.wav.
     Accepts either a base path ending with .wav or a CH1 path like *_CH1.wav.
     Returns: fs (int), X with shape (channels, samples) as float64.
     """
+
     p = str(wav_ch1_path)
     channels = []
     for i in use_mic_id:
         temp_path = p.replace('.wav', f'_CH{i}.wav')
+        # temp_path = temp_path.replace('test/', f'test_raw/')
+        # temp_path = temp_path.replace('ma_noisy_speech', f'ma_speech')
         if i == 0:
             info = sf.info(temp_path)
             fs_ref = info.samplerate
@@ -145,27 +192,32 @@ def load_segment_multichannel(wav_ch1_path: Path, st: int, ed: int, example_idx=
     # SRP expects (C, T)
     X = np.stack(channels, axis=0)
 
+    # Apply bandpass filter for improved speech SSL performance
+    global FREQ_MIN, FREQ_MAX, FILTER_ORDER
+    X = apply_bandpass_filter(X, fs_ref, freq_min=FREQ_MIN, freq_max=FREQ_MAX, order=FILTER_ORDER)
+
     # Add novel noise if enabled
     global USE_NOVEL_NOISE, NOVEL_NOISE_SNR
     if USE_NOVEL_NOISE:
-        X = add_novel_noise_to_signal(X, fs_ref, example_idx, snr_db=NOVEL_NOISE_SNR)
+        X = add_novel_noise_to_signal(X, fs_ref, example_idx, snr_db=NOVEL_NOISE_SNR, use_mic_id=use_mic_id)
 
     return fs_ref, X
 
 
-def run_srp_return_details(fs: int, mic_signals: np.ndarray):
-    global SRP_GRID_CELLS, SRP_MODE, N_AVG_SAMPLES, N_DFT_BINS, FREQ_MIN, FREQ_MAX
+def run_srp_return_details(fs: int, mic_signals: np.ndarray, use_mic_id: list):
+    # Calculate mic positions based on use_mic_id
+    mic_positions = audiowu_high_array_geometry()[use_mic_id, :2]
+
     srp = ConventionalSrp(
         fs=fs,
         grid_type="doa_1D",
         n_grid_cells=SRP_GRID_CELLS,
-        mic_positions=MIC_POSITIONS,
+        mic_positions=mic_positions,
         room_dims=None,
         mode=SRP_MODE,
         interpolation=True,
         n_average_samples=N_AVG_SAMPLES,
         n_dft_bins=N_DFT_BINS
-        # TODO: Add freq_range=(FREQ_MIN, FREQ_MAX) if supported by ConventionalSrp
     )
     est_vec, srp_map, grid = srp.forward(mic_signals)
     az = float(np.degrees(np.arctan2(est_vec[1], est_vec[0])) % 360.0)
@@ -205,7 +257,7 @@ def plot_pairwise_cc_or_gcc(fs: int, X: np.ndarray, out: Path | None, use_gcc=Tr
     if out:
         axs[0].figure.savefig(out, dpi=150); plt.close(axs[0].figure)
 
-def process_row(row, idx, plots: bool, outdir: Path | None, save_cc: bool, save_gcc: bool):
+def process_row(row, idx, plots: bool, outdir: Path | None, save_cc: bool, save_gcc: bool, use_mic_id: list):
     rel = str(row["filename"]).replace("\\", "/")
     st = int(row["real_st"]); ed = int(row["real_ed"])
     gt = None
@@ -219,11 +271,11 @@ def process_row(row, idx, plots: bool, outdir: Path | None, save_cc: bool, save_
     if rel.endswith('.flac'):
         rel = rel.replace('.flac', '.wav')
     wav_path = os.path.join(BASE_DIR, rel)
-    fs, X = load_segment_multichannel(wav_path, st, ed, example_idx=idx)  # Pass example index for reproducible noise
-    if X.shape[0] != MIC_POSITIONS.shape[0]:
-        return {"idx": idx, "filename": rel, "status": f"error: mic count mismatch ({X.shape[0]} vs {MIC_POSITIONS.shape[0]})"}
+    fs, X = load_segment_multichannel(wav_path, st, ed, example_idx=idx, use_mic_id=use_mic_id)  # Pass mic IDs explicitly
+    if X.shape[0] != len(use_mic_id):
+        return {"idx": idx, "filename": rel, "status": f"error: mic count mismatch ({X.shape[0]} vs {len(use_mic_id)})"}
 
-    az, srp_obj, srp_map, grid = run_srp_return_details(fs, X)
+    az, srp_obj, srp_map, grid = run_srp_return_details(fs, X, use_mic_id)
     err = angular_error_deg(az, gt) if gt is not None else None
 
     noise_info = f" + novel noise from {NOVEL_NOISE_SCENE}" if USE_NOVEL_NOISE else ""
@@ -245,7 +297,7 @@ def process_row(row, idx, plots: bool, outdir: Path | None, save_cc: bool, save_
 
 def main():
     global CSV_PATH, BASE_DIR, USE_NOVEL_NOISE, NOVEL_NOISE_SCENE, NOVEL_NOISE_SNR
-    global SRP_GRID_CELLS, SRP_MODE, N_AVG_SAMPLES, N_DFT_BINS, FREQ_MIN, FREQ_MAX
+    global ENABLE_BANDPASS, FILTER_ORDER
     p = argparse.ArgumentParser()
     p.add_argument("--csv", default=CSV_PATH)
     p.add_argument("--base-dir", default=BASE_DIR)
@@ -268,25 +320,18 @@ def main():
     p.add_argument("--novel_noise_snr", type=float, default=5.0,
                   help="SNR in dB for novel noise addition (default: 5.0)")
 
-    # SRP parameter arguments
-    p.add_argument("--srp_grid_cells", type=int, default=720,
-                  help="Number of grid cells for SRP resolution (default: 720)")
-    p.add_argument("--srp_mode", type=str, default="gcc_phat_freq",
-                  choices=["gcc_phat_freq", "gcc_phat_time", "cross_correlation"],
-                  help="SRP algorithm mode (default: gcc_phat_freq)")
-    p.add_argument("--n_avg_samples", type=int, default=200,
-                  help="Number of samples to average for SRP stability (default: 200)")
-    p.add_argument("--n_dft_bins", type=int, default=1024,
-                  help="Number of DFT bins for frequency domain processing (default: 1024)")
-    p.add_argument("--freq_min", type=int, default=300,
-                  help="Minimum frequency in Hz for SRP processing (default: 300)")
-    p.add_argument("--freq_max", type=int, default=3000,
-                  help="Maximum frequency in Hz for SRP processing (default: 3000)")
-
     # Array diameter selection
     p.add_argument("--array_diameter", type=str, default="6cm",
                   choices=["6cm", "12cm", "18cm"],
                   help="Microphone array diameter: 6cm (mics 0-8), 12cm (mics 0,9-16), 18cm (mics 0,17-24)")
+
+    # Bandpass filter arguments
+    p.add_argument("--enable_bandpass", action="store_true", default=True,
+                  help="Enable bandpass filtering for improved speech SSL performance (default: True)")
+    p.add_argument("--disable_bandpass", action="store_true", default=False,
+                  help="Disable bandpass filtering (overrides --enable_bandpass)")
+    p.add_argument("--filter_order", type=int, default=6,
+                  help="Butterworth filter order for bandpass filtering (default: 6)")
 
     args = p.parse_args()
 
@@ -295,28 +340,23 @@ def main():
     NOVEL_NOISE_SCENE = args.novel_noise_scene
     NOVEL_NOISE_SNR = args.novel_noise_snr
 
-    # Set global SRP parameters
-    SRP_GRID_CELLS = args.srp_grid_cells
-    SRP_MODE = args.srp_mode
-    N_AVG_SAMPLES = args.n_avg_samples
-    N_DFT_BINS = args.n_dft_bins
-    FREQ_MIN = args.freq_min
-    FREQ_MAX = args.freq_max
+    # Set global bandpass filter parameters
+    ENABLE_BANDPASS = args.enable_bandpass and not args.disable_bandpass
+    FILTER_ORDER = args.filter_order
 
     # Set microphone array configuration
-    global USE_MIC_ID, MIC_POSITIONS
     if args.array_diameter == "6cm":
-        USE_MIC_ID = [0, 1, 2, 3, 4, 5, 6, 7, 8]  # 6cm diameter
+        use_mic_id = [0, 1, 2, 3, 4, 5, 6, 7, 8]  # 6cm diameter
     elif args.array_diameter == "12cm":
-        USE_MIC_ID = [0] + list(range(9, 17))  # 12cm diameter: 0, 9-16
+        use_mic_id = [0] + list(range(9, 17))  # 12cm diameter: 0, 9-16
     elif args.array_diameter == "18cm":
-        USE_MIC_ID = [0] + list(range(17, 25))  # 18cm diameter: 0, 17-24
+        use_mic_id = [0] + list(range(17, 25))  # 18cm diameter: 0, 17-24
 
-    # Update microphone positions based on selected array
-    MIC_POSITIONS = audiowu_high_array_geometry()[USE_MIC_ID, :2]
-    # Debug: Print array info (will be updated after argument parsing)
-    print(f"Microphone positions (m):\n{MIC_POSITIONS}")
-    print(f"Array diameter: {np.max(np.linalg.norm(MIC_POSITIONS, axis=1)) * 2:.3f}m")
+    # Calculate microphone positions based on selected array
+    mic_positions = audiowu_high_array_geometry()[use_mic_id, :2]
+    # Debug: Print array info
+    print(f"Microphone positions (m):\n{mic_positions}")
+    print(f"Array diameter: {np.max(np.linalg.norm(mic_positions, axis=1)) * 2:.3f}m")
 
     if USE_NOVEL_NOISE:
         print(f"Using novel noise from scene: {NOVEL_NOISE_SCENE}")
@@ -330,11 +370,19 @@ def main():
     print(f"  DFT bins: {N_DFT_BINS}")
     print(f"  Frequency range: {FREQ_MIN}-{FREQ_MAX} Hz")
 
+    print(f"Bandpass Filter Settings:")
+    print(f"  Enabled: {ENABLE_BANDPASS}")
+    if ENABLE_BANDPASS:
+        print(f"  Filter order: {FILTER_ORDER}")
+        print(f"  Filter band: {FREQ_MIN}-{FREQ_MAX} Hz")
+    else:
+        print(f"  Using full frequency spectrum")
+
     print(f"Microphone Array Configuration:")
     print(f"  Array diameter: {args.array_diameter}")
-    print(f"  Microphone IDs: {USE_MIC_ID}")
-    print(f"  Actual diameter: {np.max(np.linalg.norm(MIC_POSITIONS, axis=1)) * 2:.3f}m")
-    print(f"  Number of microphones: {len(USE_MIC_ID)}")
+    print(f"  Microphone IDs: {use_mic_id}")
+    print(f"  Actual diameter: {np.max(np.linalg.norm(mic_positions, axis=1)) * 2:.3f}m")
+    print(f"  Number of microphones: {len(use_mic_id)}")
 
     CSV_PATH = args.csv; BASE_DIR = args.base_dir
     outdir = Path(args.outdir) if args.outdir else None
@@ -363,7 +411,7 @@ def main():
     for idx, row in rows:
         try:
             res = process_row(row, idx, plots=args.plots, outdir=outdir,
-                              save_cc=args.save_cc, save_gcc=args.save_gcc)
+                              save_cc=args.save_cc, save_gcc=args.save_gcc, use_mic_id=use_mic_id)
         except Exception as e:
             res = {"idx": idx, "filename": row['filename'], "status": f"error: {e}"}
             print(f"[ERROR] {row['filename']}: {e}")
