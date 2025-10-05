@@ -1,0 +1,68 @@
+{
+  "analysis_info": {
+    "timestamp": "2025-10-05T11:58:39.460525",
+    "analysis_type": "CRNN Geometry Robustness Analysis",
+    "test_dataset": "/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/test/test_static_source_location_08.csv",
+    "arrays_tested": [
+      "6cm",
+      "12cm"
+    ]
+  },
+  "srp_results": {
+    "6cm": {
+      "success": true,
+      "file": "/Users/danieltoberman/Documents/git/Thesis/hybrid_system/analysis/geometry_robustness/srp_clean_6cm_results.csv",
+      "duration": 846.7237567901611,
+      "num_cases": 2009,
+      "mean_error": 72.31903981670042,
+      "success_rate": 30.910900945744153
+    },
+    "12cm": {
+      "success": true,
+      "file": "/Users/danieltoberman/Documents/git/Thesis/hybrid_system/analysis/geometry_robustness/srp_clean_12cm_results.csv",
+      "duration": 876.9936361312866,
+      "num_cases": 2009,
+      "mean_error": 85.7685145957466,
+      "success_rate": 16.923842707814835
+    }
+  },
+  "crnn_results": {
+    "6cm": {
+      "success": false,
+      "needs_generation": true,
+      "mic_channels": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "output_file": "/Users/danieltoberman/Documents/git/Thesis/hybrid_system/analysis/geometry_robustness/crnn_clean_6cm_results.csv"
+    },
+    "12cm": {
+      "success": true,
+      "file": "/Users/danieltoberman/Documents/git/Thesis/hybrid_system/analysis/geometry_robustness/crnn_clean_12cm_results.csv",
+      "num_cases": 2009,
+      "mean_error": 63.34196117471379
+    }
+  },
+  "geometry_analysis": {
+    "srp_geometry_effect": {
+      "6cm_mae": 72.31903981670042,
+      "12cm_mae": 85.7685145957466,
+      "degradation_degrees": 13.44947477904617,
+      "degradation_percentage": 18.597418899829368,
+      "robust_to_geometry": "False"
+    },
+    "crnn_geometry_effect": {},
+    "comparative_analysis": {}
+  },
+  "key_findings": [
+    "SRP geometry degradation: 13.4\u00b0 (6cm\u219212cm)"
+  ],
+  "research_implications": []
+}

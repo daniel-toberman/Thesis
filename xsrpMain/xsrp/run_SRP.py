@@ -19,7 +19,7 @@ from utils_ import audiowu_high_array_geometry
 USE_NOVEL_NOISE = False
 NOVEL_NOISE_SCENE = "BadmintonCourt1"
 NOVEL_NOISE_SNR = 5.0
-NOVEL_NOISE_ROOT = "/Users/danieltoberman/Documents/RealMAN_9_channels/extracted/train/ma_noise"
+NOVEL_NOISE_ROOT = "/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted/train/ma_noise"
 
 # === CONFIG (defaults; can override with CLI) ===
 # === CONFIG (defaults; can override with CLI) ===
@@ -32,7 +32,7 @@ MIC_POSITIONS = audiowu_high_array_geometry()[USE_MIC_ID, :2]
 
 # Default SRP parameters - can be overridden via command line
 SRP_GRID_CELLS = 360
-SRP_MODE = "gcc_phat_time"   # Try time domain - might be better for small arrays
+SRP_MODE = "gcc_phat_freq"   # Try time domain - might be better for small arrays
 N_AVG_SAMPLES = 100         # Even more averaging for stability
 N_DFT_BINS = 1024           # Smaller DFT for faster processing
 FREQ_MIN = 300              # Minimum frequency in Hz

@@ -1,0 +1,65 @@
+{
+  "analysis_info": {
+    "timestamp": "2025-09-29T16:42:44.716955",
+    "analysis_type": "Complete SRP Strengths Analysis - Option 3",
+    "excellence_threshold_degrees": 1.0,
+    "test_dataset": "/Users/danieltoberman/Documents/RealMAN_9_channels/test/test_static_source_location.csv",
+    "arrays_tested": [
+      "6cm",
+      "12cm",
+      "18cm"
+    ]
+  },
+  "dataset_info": {
+    "total_test_cases": 4400,
+    "novel_noise_scene": "Cafeteria2",
+    "novel_noise_snr": 5.0
+  },
+  "srp_performance": {
+    "6cm": {
+      "success": true,
+      "total_cases": 4400,
+      "processing_duration_seconds": 1990.8224477767944
+    },
+    "12cm": {
+      "success": true,
+      "total_cases": 4400,
+      "processing_duration_seconds": 5269.310329198837
+    },
+    "18cm": {
+      "success": true,
+      "total_cases": 4400,
+      "processing_duration_seconds": 1854.6260831356049
+    }
+  },
+  "excellent_cases_analysis": {
+    "6cm": {
+      "excellent_count": 89,
+      "excellent_percentage": 2.0227272727272725,
+      "mean_error_degrees": 76.58345786963507,
+      "excellent_mean_error_degrees": 0.49028249051011835
+    },
+    "12cm": {
+      "excellent_count": 22,
+      "excellent_percentage": 0.5,
+      "mean_error_degrees": 85.6158240713373,
+      "excellent_mean_error_degrees": 0.47943176067188115
+    },
+    "18cm": {
+      "excellent_count": 15,
+      "excellent_percentage": 0.3409090909090909,
+      "mean_error_degrees": 86.69364102130629,
+      "excellent_mean_error_degrees": 0.45822339734577516
+    }
+  },
+  "best_performance": {
+    "best_array": "6cm",
+    "best_percentage": 2.0227272727272725
+  },
+  "srp_vs_crnn_comparison": "No CRNN data available",
+  "key_findings": [
+    "SRP found 126 excellent cases (<1\u00b0 error) across all arrays out of 4400 total cases",
+    "Best performing array: 6cm with 2.0% excellent cases",
+    "Array performance range: 0.3% - 2.0% excellent cases"
+  ]
+}

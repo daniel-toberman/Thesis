@@ -35,10 +35,10 @@ def _norm(p: str) -> str:
     return p.replace("\\", "/").rstrip("/")
 
 
-DATA_ROOT = _norm(os.environ.get("DATA_ROOT", r"/Users/danieltoberman/Documents/RealMAN_9_channels/extracted"))
+DATA_ROOT = _norm(os.environ.get("DATA_ROOT", r"/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted"))
 CSV_ROOT = _norm(
-    os.environ.get("CSV_ROOT", r"/Users/danieltoberman/Documents/RealMAN_9_channels"))  # where the CSVs live (we also copied CSVs into the partition)
-NOISE_ROOT = _norm(os.environ.get("NOISE_ROOT", r"/Users/danieltoberman/Documents/RealMAN_9_channels/extracted"))
+    os.environ.get("CSV_ROOT", r"/Users/danieltoberman/Documents/RealMAN_dataset_T60_08"))  # where the CSVs live (we also copied CSVs into the partition)
+NOISE_ROOT = _norm(os.environ.get("NOISE_ROOT", r"/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted"))
 
 # Global variables for novel noise - will be set by CLI
 USE_NOVEL_NOISE = False
@@ -50,7 +50,7 @@ def get_noise_dir_for_dataset(dataset_type, use_novel_noise=False, novel_noise_s
         return f"{NOISE_ROOT}/{dataset_type}/ma_noise/"
     else:
         # For novel noise, always use high T60 noise from full dataset
-        return f"/Users/danieltoberman/Documents/RealMAN_9_channels/extracted/train/ma_noise/{novel_noise_scene}/"
+        return f"/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted/train/ma_noise/{novel_noise_scene}/"
 
 def create_datasets(use_novel_noise=False, novel_noise_scene="BadmintonCourt1", novel_noise_snr=5.0):
     """Create datasets with appropriate noise directories."""
@@ -72,10 +72,11 @@ def create_datasets(use_novel_noise=False, novel_noise_scene="BadmintonCourt1", 
 
     dataset_test = RealData(
         data_dir=f"{DATA_ROOT}/",
-        target_dir=[f"{CSV_ROOT}/test/test_static_source_location.csv"],
+        target_dir=[f"{CSV_ROOT}/test/test_static_source_location_08.csv"],
         noise_dir=get_noise_dir_for_dataset("test", use_novel_noise, novel_noise_scene),
         on_the_fly=use_novel_noise,  # Enable noise only when using novel noise
-        novel_noise_snr=novel_noise_snr if use_novel_noise else None
+        novel_noise_snr=novel_noise_snr if use_novel_noise else None,
+        use_mic_id=[0] + list(range(9, 17))
     )
 
     return dataset_train, dataset_val, dataset_test
