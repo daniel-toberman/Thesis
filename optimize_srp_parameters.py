@@ -21,9 +21,9 @@ from datetime import datetime
 
 # Parameter ranges to test
 PARAMETER_RANGES = {
-    'n_dft_bins': [256, 512, 1024, 2048, 4096, 8192],  # 6 values, up to 2^13
+    'n_dft_bins': [256, 512, 1024, 2048, 4096, 8192, 2**14],  # 6 values, up to 2^13
     'n_avg_samples': [1, 5, 10, 50],                   # 4 values
-    'srp_grid_cells': [360, 720],                      # 2 values
+    'srp_grid_cells': [360],                      # 2 values
     'freq_min': [200, 300],                            # 2 values
     'freq_max': [3000, 4000],                          # 2 values
 }
@@ -41,19 +41,69 @@ FIXED_PARAMS = {
 # Phase settings
 PHASE1_N_SAMPLES = 100  # Number of samples for initial screening
 TOP_K = 10              # Number of top combinations to test in phase 2
+RESULTS_CSV = 'srp_optimization_results.csv'  # Unified results file
+
+def generate_parameter_hash(params):
+    """Generate a unique hash for parameter combination."""
+    # Sort parameters by key to ensure consistent hashing
+    sorted_params = tuple(sorted(params.items()))
+    return hash(sorted_params)
+
+def load_existing_results():
+    """Load existing results if they exist."""
+    if os.path.exists(RESULTS_CSV):
+        try:
+            df = pd.read_csv(RESULTS_CSV)
+            print(f"Loaded {len(df)} existing results from {RESULTS_CSV}")
+            return df
+        except Exception as e:
+            print(f"Warning: Could not load existing results: {e}")
+            return pd.DataFrame()
+    else:
+        print(f"No existing results found at {RESULTS_CSV}")
+        return pd.DataFrame()
+
+def get_existing_parameter_hashes(df_existing):
+    """Get hashes of existing parameter combinations."""
+    if df_existing.empty:
+        return set()
+
+    existing_hashes = set()
+    param_cols = list(PARAMETER_RANGES.keys())
+
+    for _, row in df_existing.iterrows():
+        params = {col: int(row[col]) for col in param_cols if col in row}
+        param_hash = generate_parameter_hash(params)
+        existing_hashes.add(param_hash)
+
+    return existing_hashes
 
 def generate_parameter_combinations():
-    """Generate all parameter combinations to test."""
+    """Generate all parameter combinations to test, excluding existing ones."""
     param_names = list(PARAMETER_RANGES.keys())
     param_values = list(PARAMETER_RANGES.values())
 
-    combinations = []
+    # Load existing results and get parameter hashes
+    df_existing = load_existing_results()
+    existing_hashes = get_existing_parameter_hashes(df_existing)
+
+    all_combinations = []
+    new_combinations = []
+
     for combo in product(*param_values):
         param_dict = dict(zip(param_names, combo))
-        combinations.append(param_dict)
+        param_hash = generate_parameter_hash(param_dict)
 
-    print(f"Generated {len(combinations)} parameter combinations")
-    return combinations
+        all_combinations.append(param_dict)
+
+        if param_hash not in existing_hashes:
+            new_combinations.append(param_dict)
+
+    print(f"Total parameter combinations: {len(all_combinations)}")
+    print(f"Existing combinations: {len(existing_hashes)}")
+    print(f"New combinations to test: {len(new_combinations)}")
+
+    return new_combinations, df_existing
 
 def run_srp_with_params(params, n_samples=None, quiet=True):
     """Run SRP with given parameters and return results."""
@@ -71,9 +121,9 @@ def run_srp_with_params(params, n_samples=None, quiet=True):
     if FIXED_PARAMS['enable_bandpass']:
         cmd.append('--enable_bandpass')
 
-    # Add variable parameters
+    # Add variable parameters (ensure integers are passed as integers)
     for param, value in params.items():
-        cmd.extend([f'--{param}', str(value)])
+        cmd.extend([f'--{param}', str(int(value)) if isinstance(value, (int, float)) else str(value)])
 
     # Add sample limit and randomization for phase 1
     if n_samples is not None:
@@ -145,9 +195,13 @@ def calculate_metrics(results_df):
         'success_rate': float(len(successful_results) / len(results_df))
     }
 
-def phase1_screening(combinations):
+def phase1_screening(combinations, df_existing):
     """Phase 1: Screen all combinations on limited samples."""
-    print(f"\n=== PHASE 1: Screening {len(combinations)} combinations on {PHASE1_N_SAMPLES} samples ===")
+    if not combinations:
+        print("\n=== PHASE 1: No new combinations to test ===\n")
+        return pd.DataFrame()
+
+    print(f"\n=== PHASE 1: Screening {len(combinations)} NEW combinations on {PHASE1_N_SAMPLES} samples ===")
 
     results = []
     start_time = time.time()
@@ -167,6 +221,8 @@ def phase1_screening(combinations):
         result_entry = {
             'combination_id': i,
             'run_time_sec': run_time,
+            'phase': 1,
+            'is_full_dataset': False,
             **params,  # Unpack parameter values
             **metrics  # Unpack metrics
         }
@@ -182,12 +238,25 @@ def phase1_screening(combinations):
             remaining = (elapsed / (i + 1)) * (len(combinations) - i - 1)
             print(f"    Progress: {i+1}/{len(combinations)}, Elapsed: {elapsed/60:.1f}min, Est. remaining: {remaining/60:.1f}min")
 
-    # Save final phase 1 results
+    # Save phase 1 results and append to unified results
     df_phase1 = pd.DataFrame(results)
+    if not df_phase1.empty:
+        # Append to unified results file
+        if not os.path.exists(RESULTS_CSV):
+            df_phase1.to_csv(RESULTS_CSV, index=False)
+        else:
+            df_phase1.to_csv(RESULTS_CSV, mode='a', header=False, index=False)
+
+    # Save separate phase 1 file for backwards compatibility
     df_phase1.to_csv('srp_phase1_results.csv', index=False)
 
-    # Sort by MAE and get top combinations
-    df_sorted = df_phase1.sort_values('mae')
+    # Combine with existing results and get top combinations
+    df_all_phase1 = pd.concat([df_existing[df_existing.get('phase', 1) == 1], df_phase1], ignore_index=True)
+    if df_all_phase1.empty:
+        print("No phase 1 results available for phase 2")
+        return pd.DataFrame()
+
+    df_sorted = df_all_phase1.sort_values('mae')
     top_combinations = df_sorted.head(TOP_K)
 
     print(f"\n=== Phase 1 Complete ===")
@@ -197,17 +266,45 @@ def phase1_screening(combinations):
 
     return top_combinations
 
-def phase2_validation(top_combinations):
+def phase2_validation(top_combinations, df_existing):
     """Phase 2: Test top combinations on full dataset."""
-    print(f"\n=== PHASE 2: Testing top {len(top_combinations)} combinations on full dataset ===")
+    if top_combinations.empty:
+        print("\n=== PHASE 2: No combinations available for full testing ===\n")
+        return pd.DataFrame(), pd.Series(dtype=object)
+
+    # Check which combinations already have full dataset results
+    existing_phase2_hashes = set()
+    if not df_existing.empty:
+        phase2_existing = df_existing[df_existing.get('is_full_dataset', False) == True]
+        existing_phase2_hashes = get_existing_parameter_hashes(phase2_existing)
+
+    # Filter out combinations that already have phase 2 results
+    combinations_to_test = []
+    for _, row in top_combinations.iterrows():
+        params = {key: int(row[key]) for key in PARAMETER_RANGES.keys()}
+        param_hash = generate_parameter_hash(params)
+        if param_hash not in existing_phase2_hashes:
+            combinations_to_test.append((_, row))
+
+    if not combinations_to_test:
+        print(f"\n=== PHASE 2: All top {len(top_combinations)} combinations already tested on full dataset ===\n")
+        # Return existing phase 2 results
+        phase2_results = df_existing[df_existing.get('is_full_dataset', False) == True]
+        if not phase2_results.empty:
+            best_combo = phase2_results.loc[phase2_results['mae'].idxmin()]
+            return phase2_results, best_combo
+        else:
+            return pd.DataFrame(), pd.Series(dtype=object)
+
+    print(f"\n=== PHASE 2: Testing {len(combinations_to_test)} NEW combinations on full dataset ({len(top_combinations) - len(combinations_to_test)} already completed) ===")
 
     results = []
     start_time = time.time()
 
-    for i, (_, row) in enumerate(top_combinations.iterrows()):
-        # Extract parameters
-        params = {key: row[key] for key in PARAMETER_RANGES.keys()}
-        print(f"[{i+1}/{len(top_combinations)}] Full test: {params}")
+    for i, (_, row) in enumerate(combinations_to_test):
+        # Extract parameters and ensure they are integers
+        params = {key: int(row[key]) for key in PARAMETER_RANGES.keys()}
+        print(f"[{i+1}/{len(combinations_to_test)}] Full test: {params}")
 
         # Run SRP on full dataset
         run_start = time.time()
@@ -222,6 +319,8 @@ def phase2_validation(top_combinations):
             'combination_id': row['combination_id'],
             'phase1_mae': row['mae'],  # Original phase 1 MAE
             'run_time_sec': run_time,
+            'phase': 2,
+            'is_full_dataset': True,
             **params,  # Unpack parameter values
             **metrics  # Unpack metrics (phase 2)
         }
@@ -230,17 +329,33 @@ def phase2_validation(top_combinations):
         print(f"    MAE: {metrics['mae']:.2f}° (Phase 1: {row['mae']:.2f}°), Time: {run_time:.1f}s")
 
     # Save phase 2 results
-    df_phase2 = pd.DataFrame(results)
-    df_phase2.to_csv('srp_phase2_results.csv', index=False)
+    df_phase2_new = pd.DataFrame(results)
+    if not df_phase2_new.empty:
+        # Add phase identifier
+        df_phase2_new['phase'] = 2
+        df_phase2_new['is_full_dataset'] = True
+
+        # Append to unified results file
+        df_phase2_new.to_csv(RESULTS_CSV, mode='a', header=False, index=False)
+
+    # Combine with existing phase 2 results
+    existing_phase2 = df_existing[df_existing.get('is_full_dataset', False) == True]
+    df_phase2_all = pd.concat([existing_phase2, df_phase2_new], ignore_index=True)
+
+    # Save separate phase 2 file for backwards compatibility
+    df_phase2_all.to_csv('srp_phase2_results.csv', index=False)
 
     # Find best combination
-    best_combo = df_phase2.loc[df_phase2['mae'].idxmin()]
+    if df_phase2_all.empty:
+        return pd.DataFrame(), pd.Series(dtype=object)
+
+    best_combo = df_phase2_all.loc[df_phase2_all['mae'].idxmin()]
 
     print(f"\n=== Phase 2 Complete ===")
     print(f"Total time: {(time.time() - start_time)/60:.1f} minutes")
     print(f"Best final MAE: {best_combo['mae']:.2f}°")
 
-    return df_phase2, best_combo
+    return df_phase2_all, best_combo
 
 def generate_report(df_phase1, df_phase2, best_combo):
     """Generate optimization report."""
@@ -286,8 +401,9 @@ def generate_report(df_phase1, df_phase2, best_combo):
         f"- Best vs Worst: {df_phase2['mae'].min():.2f}° vs {df_phase2['mae'].max():.2f}°",
         "",
         "## Files Generated",
-        "- srp_phase1_results.csv - All combinations screening results",
-        "- srp_phase2_results.csv - Top combinations full validation",
+        f"- {RESULTS_CSV} - Unified optimization results",
+        "- srp_phase1_results.csv - All combinations screening results (legacy)",
+        "- srp_phase2_results.csv - Top combinations full validation (legacy)",
         "- srp_optimization_report.txt - This report"
     ])
 
@@ -305,26 +421,35 @@ def main():
     print(f"Phase 1: {PHASE1_N_SAMPLES} samples per combination")
     print(f"Phase 2: Full dataset for top {TOP_K} combinations")
 
-    # Generate all parameter combinations
-    combinations = generate_parameter_combinations()
+    # Generate all parameter combinations (excluding existing ones)
+    combinations, df_existing = generate_parameter_combinations()
 
-    # Phase 1: Screen all combinations
-    top_combinations = phase1_screening(combinations)
+    # Phase 1: Screen new combinations
+    top_combinations = phase1_screening(combinations, df_existing)
 
     # Phase 2: Validate top combinations
-    df_phase2, best_combo = phase2_validation(top_combinations)
+    df_phase2, best_combo = phase2_validation(top_combinations, df_existing)
 
     # Generate report
-    df_phase1 = pd.read_csv('srp_phase1_results.csv')
-    generate_report(df_phase1, df_phase2, best_combo)
+    if os.path.exists(RESULTS_CSV):
+        df_all_results = pd.read_csv(RESULTS_CSV)
+        df_phase1_all = df_all_results[df_all_results.get('phase', 1) == 1]
+        generate_report(df_phase1_all, df_phase2, best_combo)
+    else:
+        print("No results available for report generation")
+        return
 
-    print("\n" + "="*50)
-    print("OPTIMIZATION COMPLETE")
-    print(f"Optimal Parameters:")
-    for param in PARAMETER_RANGES.keys():
-        print(f"  {param.upper()}: {best_combo[param]}")
-    print(f"Best MAE: {best_combo['mae']:.2f}°")
-    print("="*50)
+    if not best_combo.empty and 'mae' in best_combo:
+        print("\n" + "="*50)
+        print("OPTIMIZATION COMPLETE")
+        print(f"Optimal Parameters:")
+        for param in PARAMETER_RANGES.keys():
+            if param in best_combo:
+                print(f"  {param.upper()}: {int(best_combo[param])}")
+        print(f"Best MAE: {best_combo['mae']:.2f}°")
+        print("="*50)
+    else:
+        print("\nOptimization completed but no valid results found.")
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,65 @@
+# SRP Parameter Optimization Report
+Generated: 2025-10-16 11:38:39
+
+## Summary
+- Total combinations tested: 192
+- Phase 1 samples per combination: 100
+- Phase 2 combinations tested: 10
+- Best MAE achieved: inf°
+
+## Optimal Parameters
+```
+N_DFT_BINS = 8192.0
+N_AVG_SAMPLES = 50.0
+SRP_GRID_CELLS = 720.0
+FREQ_MIN = 300.0
+FREQ_MAX = 4000.0
+```
+
+## Top 5 Combinations (Phase 2 Results)
+
+1. MAE: inf°
+   n_dft_bins: 8192.0
+   n_avg_samples: 50.0
+   srp_grid_cells: 720.0
+   freq_min: 300.0
+   freq_max: 4000.0
+
+2. MAE: inf°
+   n_dft_bins: 8192.0
+   n_avg_samples: 1.0
+   srp_grid_cells: 720.0
+   freq_min: 300.0
+   freq_max: 4000.0
+
+3. MAE: inf°
+   n_dft_bins: 8192.0
+   n_avg_samples: 5.0
+   srp_grid_cells: 720.0
+   freq_min: 300.0
+   freq_max: 4000.0
+
+4. MAE: inf°
+   n_dft_bins: 8192.0
+   n_avg_samples: 10.0
+   srp_grid_cells: 720.0
+   freq_min: 300.0
+   freq_max: 4000.0
+
+5. MAE: inf°
+   n_dft_bins: 8192.0
+   n_avg_samples: 50.0
+   srp_grid_cells: 360.0
+   freq_min: 300.0
+   freq_max: 4000.0
+
+## Performance Analysis
+
+- Mean MAE (all Phase 2): inf°
+- Std MAE (all Phase 2): nan°
+- Best vs Worst: inf° vs inf°
+
+## Files Generated
+- srp_phase1_results.csv - All combinations screening results
+- srp_phase2_results.csv - Top combinations full validation
+- srp_optimization_report.txt - This report
