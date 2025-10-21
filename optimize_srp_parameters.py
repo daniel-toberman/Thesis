@@ -21,7 +21,7 @@ from datetime import datetime
 
 # Parameter ranges to test
 PARAMETER_RANGES = {
-    'n_dft_bins': [256, 512, 1024, 2048, 4096, 8192, 2**14],  # 6 values, up to 2^13
+    'n_dft_bins': [256, 512, 1024, 2048, 4096, 8192, 2**14, 2**15],  # 6 values, up to 2^13
     'n_avg_samples': [1, 5, 10, 50],                   # 4 values
     'srp_grid_cells': [360],                      # 2 values
     'freq_min': [200, 300],                            # 2 values
@@ -130,15 +130,18 @@ def run_srp_with_params(params, n_samples=None, quiet=True):
         cmd.extend(['--n', str(n_samples), '--random', '--seed', '42'])
 
     try:
-        # Run the command
-        if quiet:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)  # 10 min timeout
+        # Run the command without timeout
+        # For phase 2 (full dataset), show output in real-time
+        if quiet and n_samples is not None:
+            # Phase 1: capture output
+            result = subprocess.run(cmd, capture_output=True, text=True)
         else:
-            result = subprocess.run(cmd, timeout=600)
+            # Phase 2: show output in real-time (no capture)
+            result = subprocess.run(cmd)
 
         if result.returncode != 0:
             print(f"ERROR: SRP run failed with params {params}")
-            if quiet:
+            if quiet and n_samples is not None:
                 print(f"STDERR: {result.stderr}")
             return None
 
@@ -154,9 +157,6 @@ def run_srp_with_params(params, n_samples=None, quiet=True):
             print(f"WARNING: Results CSV not found at {csv_path}")
             return None
 
-    except subprocess.TimeoutExpired:
-        print(f"TIMEOUT: SRP run timed out with params {params}")
-        return None
     except Exception as e:
         print(f"ERROR: Exception during SRP run: {e}")
         return None
@@ -199,6 +199,15 @@ def phase1_screening(combinations, df_existing):
     """Phase 1: Screen all combinations on limited samples."""
     if not combinations:
         print("\n=== PHASE 1: No new combinations to test ===\n")
+        # If no new combinations, return top combinations from existing results
+        if not df_existing.empty and 'phase' in df_existing.columns:
+            existing_phase1 = df_existing[df_existing['phase'] == 1]
+            if not existing_phase1.empty:
+                df_sorted = existing_phase1.sort_values('mae')
+                top_combinations = df_sorted.head(TOP_K)
+                print(f"Using top {len(top_combinations)} combinations from existing Phase 1 results")
+                print(f"Best existing MAE: {df_sorted.iloc[0]['mae']:.2f}°")
+                return top_combinations
         return pd.DataFrame()
 
     print(f"\n=== PHASE 1: Screening {len(combinations)} NEW combinations on {PHASE1_N_SAMPLES} samples ===")
@@ -251,7 +260,12 @@ def phase1_screening(combinations, df_existing):
     df_phase1.to_csv('srp_phase1_results.csv', index=False)
 
     # Combine with existing results and get top combinations
-    df_all_phase1 = pd.concat([df_existing[df_existing.get('phase', 1) == 1], df_phase1], ignore_index=True)
+    # Filter existing results for phase 1 (handle missing 'phase' column)
+    if not df_existing.empty and 'phase' in df_existing.columns:
+        existing_phase1 = df_existing[df_existing['phase'] == 1]
+    else:
+        existing_phase1 = pd.DataFrame()
+    df_all_phase1 = pd.concat([existing_phase1, df_phase1], ignore_index=True)
     if df_all_phase1.empty:
         print("No phase 1 results available for phase 2")
         return pd.DataFrame()
@@ -274,8 +288,8 @@ def phase2_validation(top_combinations, df_existing):
 
     # Check which combinations already have full dataset results
     existing_phase2_hashes = set()
-    if not df_existing.empty:
-        phase2_existing = df_existing[df_existing.get('is_full_dataset', False) == True]
+    if not df_existing.empty and 'is_full_dataset' in df_existing.columns:
+        phase2_existing = df_existing[df_existing['is_full_dataset'] == True]
         existing_phase2_hashes = get_existing_parameter_hashes(phase2_existing)
 
     # Filter out combinations that already have phase 2 results
@@ -289,7 +303,10 @@ def phase2_validation(top_combinations, df_existing):
     if not combinations_to_test:
         print(f"\n=== PHASE 2: All top {len(top_combinations)} combinations already tested on full dataset ===\n")
         # Return existing phase 2 results
-        phase2_results = df_existing[df_existing.get('is_full_dataset', False) == True]
+        if 'is_full_dataset' in df_existing.columns:
+            phase2_results = df_existing[df_existing['is_full_dataset'] == True]
+        else:
+            phase2_results = pd.DataFrame()
         if not phase2_results.empty:
             best_combo = phase2_results.loc[phase2_results['mae'].idxmin()]
             return phase2_results, best_combo
@@ -339,7 +356,10 @@ def phase2_validation(top_combinations, df_existing):
         df_phase2_new.to_csv(RESULTS_CSV, mode='a', header=False, index=False)
 
     # Combine with existing phase 2 results
-    existing_phase2 = df_existing[df_existing.get('is_full_dataset', False) == True]
+    if not df_existing.empty and 'is_full_dataset' in df_existing.columns:
+        existing_phase2 = df_existing[df_existing['is_full_dataset'] == True]
+    else:
+        existing_phase2 = pd.DataFrame()
     df_phase2_all = pd.concat([existing_phase2, df_phase2_new], ignore_index=True)
 
     # Save separate phase 2 file for backwards compatibility
@@ -433,7 +453,10 @@ def main():
     # Generate report
     if os.path.exists(RESULTS_CSV):
         df_all_results = pd.read_csv(RESULTS_CSV)
-        df_phase1_all = df_all_results[df_all_results.get('phase', 1) == 1]
+        if 'phase' in df_all_results.columns:
+            df_phase1_all = df_all_results[df_all_results['phase'] == 1]
+        else:
+            df_phase1_all = df_all_results  # Assume all results are phase 1 if column missing
         generate_report(df_phase1_all, df_phase2, best_combo)
     else:
         print("No results available for report generation")

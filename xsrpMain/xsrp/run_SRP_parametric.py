@@ -275,8 +275,9 @@ def process_row(row, idx, plots: bool, outdir: Path | None, save_cc: bool, save_
                                                        srp_mode, n_avg_samples, n_dft_bins)
     err = angular_error_deg(az, gt) if gt is not None else None
 
-    noise_info = f" + novel noise from {NOVEL_NOISE_SCENE}" if USE_NOVEL_NOISE else ""
-    print(f"[{idx}] {rel} -> {az:.1f}°" + (f" (gt {gt:.1f}°, err {err:.1f}°)" if gt is not None else "") + noise_info)
+    # Suppressed individual result output - progress indicator shows sample number instead
+    # noise_info = f" + novel noise from {NOVEL_NOISE_SCENE}" if USE_NOVEL_NOISE else ""
+    # print(f"[{idx}] {rel} -> {az:.1f}°" + (f" (gt {gt:.1f}°, err {err:.1f}°)" if gt is not None else "") + noise_info)
 
     if plots:
         outdir and outdir.mkdir(parents=True, exist_ok=True)
@@ -391,7 +392,11 @@ def main():
             rows = list(df.iterrows())
 
     results = []
-    for idx, row in rows:
+    total_rows = len(rows)
+    for i, (idx, row) in enumerate(rows, 1):
+        # Progress indicator (single line, updates in place)
+        print(f"\rProcessing sample {i}/{total_rows} (ID: {idx})...", end='', flush=True)
+
         try:
             res = process_row(row, idx, plots=args.plots, outdir=outdir,
                               save_cc=args.save_cc, save_gcc=args.save_gcc, use_mic_id=use_mic_id,
@@ -400,8 +405,11 @@ def main():
                               freq_min=args.freq_min, freq_max=args.freq_max)
         except Exception as e:
             res = {"idx": idx, "filename": row['filename'], "status": f"error: {e}"}
-            print(f"[ERROR] {row['filename']}: {e}")
+            print(f"\n[ERROR] {row['filename']}: {e}")
         results.append(res)
+
+    # Clear the progress line after completion
+    print(f"\rCompleted {total_rows}/{total_rows} samples.{' '*20}")
 
     if len(rows) > 1:
         out_csv = Path(CSV_PATH).with_name(Path(CSV_PATH).stem + "_srp_results.csv")
