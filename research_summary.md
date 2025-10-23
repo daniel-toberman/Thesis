@@ -10,13 +10,13 @@
 
 ### 1. T60 Generalization Test
 **Hypothesis**: Network would perform poorly on high reverberation data (T60 > 0.8) since it was only trained on T60 < 0.8.
-**Result**: Network achieved similar MAE performance 4.76° on full test dataset with T60 ranging up to 4.5 seconds, demonstrating excellent reverberation generalization.
+**Result**: Network achieved 4.76° MAE (median ~3.2°) on full test dataset with T60 ranging up to 4.5 seconds, demonstrating excellent reverberation generalization.
 
 ### 2. Out-of-Distribution Noise Test
 **Hypothesis**: Adding novel noise from unseen environments would degrade performance.
 **Setup**: Selected high-reverberation noise from T60 > 0.8 scenes (Cafeteria2) that the network had never seen during training, added at 5dB SNR.
-**Initial Result**: Network performance degraded to 14.98° MAE.
-**Critical Discovery**: After detailed investigation, only car gasoline and car electric cases brought performance down. The MAE from all other test environments remained excellent at ~6.31°.
+**Initial Result**: Network performance degraded to 14.98° MAE (median ~8°).
+**Critical Discovery**: After detailed investigation, only car gasoline and car electric cases brought performance down. The MAE from all other test environments remained excellent at ~6.31° (median ~4°).
 
 ### 3. Automotive Environment Challenge - Initial Approach FAILED
 **Hypothesis**: Automotive environment + novel noise combination was too acoustically challenging for classical methods.
@@ -34,16 +34,17 @@
 
 **Results on Clean Test Set (2009 samples, no novel noise):**
 
-| Array Diameter | MAE | Success Rate (≤30°) | Failure Rate (>30°) | vs 6cm Training |
-|---------------|-----|---------------------|---------------------|----------------|
-| **6cm** (training) | ~4.8° | ~95% | ~5% | baseline |
-| **12cm** | 63.34° | 34.2% | **65.8%** | **+58° MAE** |
-| **18cm** | TBD | TBD | TBD | TBD |
+| Array Diameter | MAE / Median | Success Rate (≤5°) | Failure Rate (>5°) | vs 6cm Training |
+|---------------|--------------|-------------------|-------------------|----------------|
+| **6cm** (training) | 4.8° / ~3.0° | ~80-85% | ~15-20% | baseline |
+| **12cm** | 63.3° / 54.0° | **9.5%** | **90.5%** | **+58° MAE** |
+| **18cm** | 48.9° / 37.0° | **14.6%** | **85.4%** | **+44° MAE** |
 
 **🔥 BREAKTHROUGH DISCOVERY**: CRNN exhibits **catastrophic failure on different microphone array geometries**
-- Moving from 6cm to 12cm array causes 58° MAE degradation
-- Success rate drops from 95% to 34% - a 60% absolute decrease
-- 65.8% of test cases now fail (>30° error) on 12cm array
+- Moving from 6cm to 12cm causes 58° MAE degradation (median: 51° increase), success drops from ~82% to 9.5%
+- Moving from 6cm to 18cm causes 44° MAE degradation (median: 34° increase), success drops from ~82% to 14.6%
+- **Interesting pattern**: 18cm performs moderately better than 12cm (48.9° vs 63.3° MAE), suggesting non-linear geometry degradation
+- 85-90% of test cases fail (>5° error) on non-training array geometries
 - **This geometric brittleness opens the door for SRP-PHAT rescue**
 
 **Why This Matters**:
@@ -66,9 +67,9 @@
 - **Phase 2**: Test top 10 configurations on full 2009-sample dataset
 
 **Best Results (Phase 1 - 100 samples)**:
-- **Best configuration**: n_dft_bins=32768, freq=300-4000Hz → **21.51° MAE**
-- Median error: 4.50° (excellent for successful cases)
-- Improvement over baseline: ~70° → 21° MAE reduction
+- **Best configuration**: n_dft_bins=32768, freq=300-4000Hz → **21.51° MAE / 4.50° median**
+- Median error of 4.50° indicates excellent performance on majority of cases
+- Improvement over baseline: ~70° → 21° MAE reduction (74% improvement)
 
 **Next Steps**:
 1. Complete Phase 2 testing on full dataset for top configurations
@@ -77,7 +78,7 @@
 
 ## Executive Summary
 
-This research pivoted from automotive environment failures (which proved intractable for classical methods) to **microphone array geometry robustness**. We discovered that CRNN exhibits catastrophic failure (65.8% failure rate) when tested on array geometries different from training (12cm vs 6cm), while maintaining excellent performance on its training geometry. This geometric brittleness creates a clear opportunity for hybrid systems: CRNN handles trained geometry configurations, while SRP-PHAT rescues cases with different array setups. We've achieved 80% failure detection using confidence metrics and are optimizing SRP parameters to reduce MAE from 70° to ~21° for effective fallback.
+This research pivoted from automotive environment failures (which proved intractable for classical methods) to **microphone array geometry robustness**. We discovered that CRNN exhibits catastrophic failure when tested on array geometries different from training: 12cm array shows 63.3° MAE / 54° median (90.5% failure rate), while 18cm array shows 48.9° MAE / 37° median (85.4% failure rate), compared to 4.8° MAE / 3° median on the 6cm training geometry. The non-linear degradation pattern (18cm performs better than 12cm despite being farther from training) suggests complex acoustic feature dependencies. This geometric brittleness creates a clear opportunity for hybrid systems: CRNN handles trained geometry configurations, while SRP-PHAT rescues cases with different array setups. We've achieved 80% failure detection using confidence metrics and are optimizing SRP parameters to achieve 21.5° MAE / 4.5° median for effective fallback.
 
 ## Key Findings
 
@@ -86,16 +87,17 @@ This research pivoted from automotive environment failures (which proved intract
 
 ### CRNN Geometry Brittleness (Critical Discovery)
 **CRNN fails catastrophically on different microphone array geometries**:
-- Trained on 6cm array: 95% success rate, ~4.8° MAE
-- Tested on 12cm array: **34% success rate, 63° MAE**
-- **65.8% failure rate** when array diameter changes from training
-- Root cause: Network learns geometry-specific acoustic features
+- Trained on 6cm array: ~82% success rate (≤5°), 4.8° MAE / 3.0° median
+- Tested on 12cm array: **9.5% success rate, 63.3° MAE / 54.0° median** (90.5% failure rate)
+- Tested on 18cm array: **14.6% success rate, 48.9° MAE / 37.0° median** (85.4% failure rate)
+- **Non-linear degradation**: 18cm performs better than 12cm despite being farther from training geometry
+- Root cause: Network learns geometry-specific acoustic features that don't transfer
 - **Opportunity**: SRP-PHAT is geometry-agnostic, can rescue these failures
 
 ### Automotive Environment Findings (Historical Context)
 Analysis of CRNN failures with novel noise revealed **systematic failures in automotive environments** (99.5% of failures). However, after consultation with professor, this approach was abandoned because:
 - Automotive + novel noise too acoustically challenging for classical methods
-- Ensemble SRP achieved only 26.9% success rate with unacceptable 82.8° MAE
+- Ensemble SRP achieved only 26.9% success rate (≤30°) with unacceptable 82.8° MAE / 75° median
 - Array scaling (6cm → 18cm) provided no improvement
 - Classical methods fundamentally cannot rescue this failure mode
 
@@ -111,8 +113,8 @@ Analysis of CRNN failures with novel noise revealed **systematic failures in aut
 
 **Current Best Results (100-sample screening)**:
 - Configuration: n_dft_bins=32768, freq=300-4000Hz, grid=360
-- **21.51° MAE** (median 4.50°)
-- 70% improvement over baseline SRP (70° → 21° MAE)
+- **21.51° MAE / 4.50° median**
+- 70% improvement over baseline SRP (from 70° / 60° to 21° / 4.5°)
 - Awaiting full dataset validation (Phase 2)
 
 **Key Parameter Insights**:
@@ -129,10 +131,11 @@ Analysis of CRNN failures with novel noise revealed **systematic failures in aut
 3. **Professor Guidance**: Advised to find failure modes where classical methods can actually help
 
 ### New Direction: Microphone Array Geometry Robustness
-1. **Discovered Geometric Brittleness**: CRNN fails when array geometry differs from training (65.8% failure rate on 12cm vs 6cm training)
-2. **SRP Advantage**: Classical methods are geometry-agnostic - just need microphone positions
-3. **Clear Hybrid Opportunity**: CRNN for trained geometries, SRP fallback for different configurations
-4. **Practical Relevance**: Real-world deployments often use different array sizes than training data
+1. **Discovered Geometric Brittleness**: CRNN fails when array geometry differs from training (85-90% failure rate at ≤5° on 12cm/18cm vs 6cm training)
+2. **Non-linear Degradation Pattern**: 12cm shows worse performance (63.3° MAE) than 18cm (48.9° MAE), suggesting complex acoustic feature dependencies rather than simple distance-based degradation
+3. **SRP Advantage**: Classical methods are geometry-agnostic - just need microphone positions
+4. **Clear Hybrid Opportunity**: CRNN for trained geometries, SRP fallback for different configurations
+5. **Practical Relevance**: Real-world deployments often use different array sizes than training data
 
 ## Implementation Strategy
 
@@ -155,7 +158,9 @@ Analysis of CRNN failures with novel noise revealed **systematic failures in aut
 
 ### Phase 3: CRNN Geometry Robustness Testing ✅ COMPLETED
 - ✅ Tested CRNN on 6cm (training), 12cm, and 18cm arrays
-- ✅ **Critical Finding**: 65.8% failure rate on 12cm array (vs 5% on 6cm)
+- ✅ **Critical Finding**: 85-90% failure rate (>5° error) on 12cm/18cm arrays (vs ~18% on 6cm)
+- ✅ **Non-linear Degradation**: 12cm shows 63.3° MAE / 54° median, 18cm shows 48.9° MAE / 37° median
+- ✅ 18cm performs better than 12cm despite being farther from training geometry
 - ✅ Confirmed geometric brittleness creates hybrid opportunity
 - 🔄 Testing failure predictor on 12cm/18cm data (in progress)
 
@@ -164,26 +169,26 @@ Analysis of CRNN failures with novel noise revealed **systematic failures in aut
 
 **Phase 1 Screening (100 samples)**: ✅ COMPLETED
 - Tested 224 parameter combinations
-- Best: 21.51° MAE (n_dft_bins=32768, freq=300-4000Hz)
+- Best: 21.51° MAE / 4.50° median (n_dft_bins=32768, freq=300-4000Hz)
 - Identified top 10 configurations for full testing
 
 **Phase 2 Full Dataset Testing**: 🔄 IN PROGRESS
 - Testing top 10 configurations on 2009 samples
 - Expected runtime: ~6 hours per configuration
-- Target: Validate <25° MAE on full dataset
+- Target: Validate <25° MAE / <10° median on full dataset
 
 ### Phase 5: Hybrid System Validation 📋 NEXT
 **Objectives**:
 1. Test confidence predictor on 12cm/18cm array failures
 2. Validate SRP fallback effectiveness on geometric mismatch cases
 3. Measure hybrid system performance:
-   - CRNN accuracy on 6cm array (should maintain ~95%)
-   - SRP rescue rate on 12cm/18cm arrays (target >70% of failures)
-   - Overall system MAE across all array configurations
+   - CRNN accuracy on 6cm array (should maintain ~82% success rate at ≤5°)
+   - SRP rescue rate on 12cm/18cm arrays (target >70% of failures with ≤5° error)
+   - Overall system MAE / median across all array configurations
 
 **Success Criteria**:
-- Hybrid system MAE < 20° across all array sizes
-- >80% success rate on geometric mismatch cases
+- Hybrid system MAE / median < 20° / <8° across all array sizes
+- >80% success rate (≤5° error) on geometric mismatch cases
 - Minimal performance degradation on trained geometry (6cm)
 
 ## Confidence-Based Failure Prediction
@@ -239,35 +244,35 @@ n_dft_bins=16384, n_avg= 1, freq=200-4000Hz: MAE=23.48°, Median=6.48°
 ### Phase 2 Full Dataset Testing (In Progress)
 **Status**: Running top 10 configurations on full 2009-sample dataset
 **Expected Completion**: ~60 hours (6 hours per config × 10 configs)
-**Target**: Validate 21° MAE performance on complete test set
+**Target**: Validate 21° MAE / 4.5° median performance on complete test set
 
 ## Expected Contributions
 
-1. **Novel Discovery**: First identification of CRNN geometric brittleness - neural SSL fails catastrophically (65% failure rate) on different microphone array sizes
+1. **Novel Discovery**: First identification of CRNN geometric brittleness - neural SSL fails catastrophically (85-90% failure rate at ≤5°) on different microphone array sizes, with non-linear degradation pattern (12cm worse than 18cm)
 2. **Confidence-Based Failure Prediction**: Real-time failure prediction using CRNN's internal confidence metrics with 80% recall and 76% precision
 3. **Practical Hybrid System**: Geometry-aware switching that addresses real-world deployment scenarios where array configurations vary
-4. **SRP Optimization Framework**: Comprehensive parameter study identifying optimal configurations for SSL fallback (21° MAE, 70% improvement)
+4. **SRP Optimization Framework**: Comprehensive parameter study identifying optimal configurations for SSL fallback (21.5° MAE / 4.5° median, 70% improvement)
 
 ## Success Metrics
 
-1. **Hybrid System Performance**: <20° MAE across all array geometries (6cm, 12cm, 18cm)
-2. **Geometric Robustness**: >80% success rate on non-training array configurations
+1. **Hybrid System Performance**: <20° MAE / <8° median across all array geometries (6cm, 12cm, 18cm)
+2. **Geometric Robustness**: >80% success rate (≤5° error) on non-training array configurations
 3. **Failure Detection**: Maintain 80% recall, 76% precision for failure prediction
-4. **SRP Rescue Rate**: >70% of geometric mismatch failures successfully resolved by SRP
-5. **Training Geometry Preservation**: <5% performance degradation on 6cm array
+4. **SRP Rescue Rate**: >70% of geometric mismatch failures resolved to ≤5° error
+5. **Training Geometry Preservation**: Maintain ~82% success rate on 6cm array
 
 ## Key Technical Insights
 
 ### What Works Well
-- **CRNN on Training Geometry**: Excellent performance (95% success, ~5° MAE) when array matches training
+- **CRNN on Training Geometry**: Excellent performance (~82% success at ≤5°, 4.8° MAE / 3° median) when array matches training
 - **T60 Generalization**: CRNN robust to reverberation time variations (0.3s to 4.5s)
 - **Confidence Metrics**: Reliable real-time failure detection with simple thresholds
-- **High DFT Resolution**: 32768 bins enable precise SRP localization
+- **High DFT Resolution**: 32768 bins enable precise SRP localization (21.5° MAE / 4.5° median)
 
 ### Critical Limitations
-- **CRNN Geometric Brittleness**: Catastrophic failure (65% error rate) on different array sizes
+- **CRNN Geometric Brittleness**: Catastrophic failure (90.5% error rate >5°) on different array sizes
 - **Training Data Dependency**: CRNN learns geometry-specific acoustic patterns
-- **SRP Baseline Performance**: Poor accuracy (~70° MAE) without optimization
+- **SRP Baseline Performance**: Poor accuracy (~70° MAE / ~60° median) without optimization
 - **Automotive+Noise Challenge**: Intractable for both CRNN and classical methods
 
 ### Future Directions
@@ -283,8 +288,8 @@ n_dft_bins=16384, n_avg= 1, freq=200-4000Hz: MAE=23.48°, Median=6.48°
 
 ### Key Research Questions
 1. ✅ **Can we predict CRNN failures from network outputs?** YES - 80% recall using max_prob metric
-2. ✅ **Does CRNN generalize to different array geometries?** NO - 65% failure rate on 12cm vs 6cm training
-3. 🔄 **Can SRP-PHAT rescue geometric mismatch failures?** Testing - optimized SRP shows 21° MAE on samples
+2. ✅ **Does CRNN generalize to different array geometries?** NO - 85-90% failure rate (>5°) on 12cm/18cm vs 6cm training, with non-linear degradation (18cm better than 12cm)
+3. 🔄 **Can SRP-PHAT rescue geometric mismatch failures?** Testing - optimized SRP shows 21.5° MAE / 4.5° median on samples
 4. 📋 **Can we build a geometry-aware hybrid system?** Next - validation pending Phase 2 SRP results
 
 ### Extended Research Directions

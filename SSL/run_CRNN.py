@@ -76,7 +76,7 @@ def create_datasets(use_novel_noise=False, novel_noise_scene="BadmintonCourt1", 
         noise_dir=get_noise_dir_for_dataset("test", use_novel_noise, novel_noise_scene),
         on_the_fly=use_novel_noise,  # Enable noise only when using novel noise
         novel_noise_snr=novel_noise_snr if use_novel_noise else None,
-        use_mic_id=[0] + list(range(9, 17))
+        use_mic_id=[0] + list(range(17, 25))
     )
 
     return dataset_train, dataset_val, dataset_test

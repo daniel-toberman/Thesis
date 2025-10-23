@@ -23,7 +23,7 @@ def _label_key_from(sig_path: str) -> str:
 
 
 class RealData(Dataset):
-    def __init__(self, data_dir, target_dir, noise_dir, input_fs=16000, use_mic_id=[1, 2, 3, 4, 5, 6, 7, 8, 0],
+    def __init__(self, data_dir, target_dir, noise_dir, input_fs=16000, use_mic_id=[0, 17, 18, 19, 20, 21, 22, 23, 24],
             target_fs=16000, snr=[-10, 15], wav_use_len=4, on_the_fly=True, is_variable_array=False, novel_noise_snr=5.0):
         self.ends = 'CH1.wav'
 
