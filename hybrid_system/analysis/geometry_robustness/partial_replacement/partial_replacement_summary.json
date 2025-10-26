@@ -1,0 +1,200 @@
+[
+  {
+    "config_name": "6cm_baseline",
+    "description": "Baseline 6cm array (training configuration)",
+    "mics": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "n_replaced": 0,
+    "replacement_type": "none",
+    "mae": 48.933797909407666,
+    "median_error": 37.0,
+    "success_rate": 14.634146341463413,
+    "n_samples": 2009,
+    "output_file": "/Users/danieltoberman/Documents/git/Thesis/hybrid_system/analysis/geometry_robustness/partial_replacement/crnn_6cm_baseline_results.csv"
+  },
+  {
+    "config_name": "6cm_1x12cm_pos1",
+    "description": "Replace mic 1 with mic 9 (12cm)",
+    "mics": [
+      0,
+      9,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "n_replaced": 1,
+    "replacement_type": "12cm",
+    "mae": 48.933797909407666,
+    "median_error": 37.0,
+    "success_rate": 14.634146341463413,
+    "n_samples": 2009,
+    "output_file": "/Users/danieltoberman/Documents/git/Thesis/hybrid_system/analysis/geometry_robustness/partial_replacement/crnn_6cm_1x12cm_pos1_results.csv"
+  },
+  {
+    "config_name": "6cm_1x12cm_pos3",
+    "description": "Replace mic 3 with mic 11 (12cm)",
+    "mics": [
+      0,
+      1,
+      2,
+      11,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "n_replaced": 1,
+    "replacement_type": "12cm",
+    "mae": 48.933797909407666,
+    "median_error": 37.0,
+    "success_rate": 14.634146341463413,
+    "n_samples": 2009,
+    "output_file": "/Users/danieltoberman/Documents/git/Thesis/hybrid_system/analysis/geometry_robustness/partial_replacement/crnn_6cm_1x12cm_pos3_results.csv"
+  },
+  {
+    "config_name": "6cm_1x12cm_pos5",
+    "description": "Replace mic 5 with mic 13 (12cm)",
+    "mics": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      13,
+      6,
+      7,
+      8
+    ],
+    "n_replaced": 1,
+    "replacement_type": "12cm",
+    "mae": 48.933797909407666,
+    "median_error": 37.0,
+    "success_rate": 14.634146341463413,
+    "n_samples": 2009,
+    "output_file": "/Users/danieltoberman/Documents/git/Thesis/hybrid_system/analysis/geometry_robustness/partial_replacement/crnn_6cm_1x12cm_pos5_results.csv"
+  },
+  {
+    "config_name": "6cm_2x12cm_opposite",
+    "description": "Replace mics 1,5 with 9,13 (12cm, opposite)",
+    "mics": [
+      0,
+      9,
+      2,
+      3,
+      4,
+      13,
+      6,
+      7,
+      8
+    ],
+    "n_replaced": 2,
+    "replacement_type": "12cm",
+    "mae": 48.933797909407666,
+    "median_error": 37.0,
+    "success_rate": 14.634146341463413,
+    "n_samples": 2009,
+    "output_file": "/Users/danieltoberman/Documents/git/Thesis/hybrid_system/analysis/geometry_robustness/partial_replacement/crnn_6cm_2x12cm_opposite_results.csv"
+  },
+  {
+    "config_name": "6cm_2x12cm_adjacent",
+    "description": "Replace mics 1,2 with 9,10 (12cm, adjacent)",
+    "mics": [
+      0,
+      9,
+      10,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "n_replaced": 2,
+    "replacement_type": "12cm",
+    "mae": 48.933797909407666,
+    "median_error": 37.0,
+    "success_rate": 14.634146341463413,
+    "n_samples": 2009,
+    "output_file": "/Users/danieltoberman/Documents/git/Thesis/hybrid_system/analysis/geometry_robustness/partial_replacement/crnn_6cm_2x12cm_adjacent_results.csv"
+  },
+  {
+    "config_name": "6cm_1x18cm_pos1",
+    "description": "Replace mic 1 with mic 17 (18cm)",
+    "mics": [
+      0,
+      17,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "n_replaced": 1,
+    "replacement_type": "18cm",
+    "mae": 48.933797909407666,
+    "median_error": 37.0,
+    "success_rate": 14.634146341463413,
+    "n_samples": 2009,
+    "output_file": "/Users/danieltoberman/Documents/git/Thesis/hybrid_system/analysis/geometry_robustness/partial_replacement/crnn_6cm_1x18cm_pos1_results.csv"
+  },
+  {
+    "config_name": "6cm_1x18cm_pos5",
+    "description": "Replace mic 5 with mic 21 (18cm)",
+    "mics": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      21,
+      6,
+      7,
+      8
+    ],
+    "n_replaced": 1,
+    "replacement_type": "18cm",
+    "mae": 48.933797909407666,
+    "median_error": 37.0,
+    "success_rate": 14.634146341463413,
+    "n_samples": 2009,
+    "output_file": "/Users/danieltoberman/Documents/git/Thesis/hybrid_system/analysis/geometry_robustness/partial_replacement/crnn_6cm_1x18cm_pos5_results.csv"
+  },
+  {
+    "config_name": "6cm_2x18cm_opposite",
+    "description": "Replace mics 1,5 with 17,21 (18cm, opposite)",
+    "mics": [
+      0,
+      17,
+      2,
+      3,
+      4,
+      21,
+      6,
+      7,
+      8
+    ],
+    "n_replaced": 2,
+    "replacement_type": "18cm",
+    "mae": 48.933797909407666,
+    "median_error": 37.0,
+    "success_rate": 14.634146341463413,
+    "n_samples": 2009,
+    "output_file": "/Users/danieltoberman/Documents/git/Thesis/hybrid_system/analysis/geometry_robustness/partial_replacement/crnn_6cm_2x18cm_opposite_results.csv"
+  }
+]

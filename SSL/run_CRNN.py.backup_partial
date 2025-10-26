@@ -43,7 +43,6 @@ NOISE_ROOT = _norm(os.environ.get("NOISE_ROOT", r"/Users/danieltoberman/Document
 # Global variables for novel noise - will be set by CLI
 USE_NOVEL_NOISE = False
 NOVEL_NOISE_SCENE = "BadmintonCourt1"
-USE_CUSTOM_MIC_ID = None  # Custom mic IDs for testing different geometries
 
 def get_noise_dir_for_dataset(dataset_type, use_novel_noise=False, novel_noise_scene="BadmintonCourt1"):
     """Get appropriate noise directory based on novel noise settings."""
@@ -55,9 +54,6 @@ def get_noise_dir_for_dataset(dataset_type, use_novel_noise=False, novel_noise_s
 
 def create_datasets(use_novel_noise=False, novel_noise_scene="BadmintonCourt1", novel_noise_snr=5.0):
     """Create datasets with appropriate noise directories."""
-
-    # Use custom mic IDs if provided, otherwise default to training configuration
-    test_mic_id = USE_CUSTOM_MIC_ID if USE_CUSTOM_MIC_ID is not None else [1, 2, 3, 4, 5, 6, 7, 8, 0]
 
     dataset_train = RealData(
         data_dir=f"{DATA_ROOT}/",
@@ -80,7 +76,7 @@ def create_datasets(use_novel_noise=False, novel_noise_scene="BadmintonCourt1", 
         noise_dir=get_noise_dir_for_dataset("test", use_novel_noise, novel_noise_scene),
         on_the_fly=use_novel_noise,  # Enable noise only when using novel noise
         novel_noise_snr=novel_noise_snr if use_novel_noise else None,
-        use_mic_id=test_mic_id  # Use variable instead of hardcoded
+        use_mic_id=[0] + list(range(17, 25))
     )
 
     return dataset_train, dataset_val, dataset_test
@@ -458,8 +454,6 @@ class MyCLI(LightningCLI):
                           help="High T60 scene to use for novel noise")
         parser.add_argument("--novel_noise_snr", type=float, default=5.0,
                           help="SNR in dB for novel noise addition (default: 5.0)")
-        parser.add_argument("--use_mic_id", type=str, default=None,
-                          help="Custom mic IDs as comma-separated list (e.g., '1,2,3,4,5,6,7,8,0' for baseline, '9,10,11,12,13,14,15,16,0' for 12cm)")
         parser.add_lightning_class_args(EarlyStopping, "early_stopping")
         parser.set_defaults({
             "early_stopping.monitor": "valid/loss",
@@ -561,23 +555,15 @@ class MyCLI(LightningCLI):
         torch.set_num_interop_threads(5)
         torch.set_num_threads(5)
 
-        # Handle custom mic IDs for geometry testing
-        use_mic_id_str = self.config.get('test', {}).get('use_mic_id', None)
-        if use_mic_id_str:
-            global USE_CUSTOM_MIC_ID
-            USE_CUSTOM_MIC_ID = [int(x.strip()) for x in use_mic_id_str.split(',')]
-            print(f"Using custom mic IDs: {USE_CUSTOM_MIC_ID}")
-
         # Handle novel noise settings for testing
         use_novel_noise = self.config.get('test', {}).get('use_novel_noise', False)
         novel_noise_scene = self.config.get('test', {}).get('novel_noise_scene', 'BadmintonCourt1')
         novel_noise_snr = self.config.get('test', {}).get('novel_noise_snr', 5.0)
 
-        # Recreate datasets with custom settings
-        if use_novel_noise or use_mic_id_str:
+        if use_novel_noise:
+            print(f"Using novel noise from scene: {novel_noise_scene}")
+            print(f"Novel noise SNR: {novel_noise_snr} dB")
             self.datamodule.update_datasets(use_novel_noise, novel_noise_scene, novel_noise_snr)
-            if use_novel_noise:
-                print(f"Using novel noise from scene: {novel_noise_scene}, SNR: {novel_noise_snr} dB")
 
         if self.config['test']['ckpt_path'] != None:
             ckpt_path = self.config['test']['ckpt_path']
