@@ -36,16 +36,49 @@
 
 | Array Diameter | MAE / Median | Success Rate (≤5°) | Failure Rate (>5°) | vs 6cm Training |
 |---------------|--------------|-------------------|-------------------|----------------|
-| **6cm** (training) | 4.8° / ~3.0° | ~80-85% | ~15-20% | baseline |
-| **12cm** | 63.3° / 54.0° | **9.5%** | **90.5%** | **+58° MAE** |
-| **18cm** | 48.9° / 37.0° | **14.6%** | **85.4%** | **+44° MAE** |
+| **6cm** (training) | 2.82° / 2.0° | 87.8% | 12.2% | baseline |
+| **12cm** (full) | 68.01° / 52.0° | **4.5%** | **95.5%** | **+65° MAE** |
+| **18cm** (full) | 56.70° / 48.0° | **5.0%** | **95.0%** | **+54° MAE** |
 
 **🔥 BREAKTHROUGH DISCOVERY**: CRNN exhibits **catastrophic failure on different microphone array geometries**
-- Moving from 6cm to 12cm causes 58° MAE degradation (median: 51° increase), success drops from ~82% to 9.5%
-- Moving from 6cm to 18cm causes 44° MAE degradation (median: 34° increase), success drops from ~82% to 14.6%
-- **Interesting pattern**: 18cm performs moderately better than 12cm (48.9° vs 63.3° MAE), suggesting non-linear geometry degradation
-- 85-90% of test cases fail (>5° error) on non-training array geometries
+- Moving from 6cm to 12cm causes 65° MAE degradation (median: 50° increase), success drops from 87.8% to 4.5%
+- Moving from 6cm to 18cm causes 54° MAE degradation (median: 46° increase), success drops from 87.8% to 5.0%
+- **Interesting pattern**: 18cm performs moderately better than 12cm (56.7° vs 68.0° MAE), suggesting non-linear geometry degradation
+- ~95% of test cases fail (>5° error) on non-training array geometries
 - **This geometric brittleness opens the door for SRP-PHAT rescue**
+
+#### Partial Microphone Replacement Test (NEW - Critical Finding)
+**Hypothesis**: Testing gradual degradation by replacing only 1-2 microphones rather than entire array.
+
+**Setup**: Starting with training configuration (6cm array), progressively replace 1-2 microphones with 12cm or 18cm positions:
+- **Baseline**: All 8 outer mics at 6cm (mics 1-8, center mic 0 always at origin)
+- **Single replacements**: Replace 1 mic at different positions (pos1, pos3, pos5)
+- **Double replacements**: Replace 2 mics (opposite positions or adjacent)
+- **Full replacement**: All 8 outer mics at 12cm or 18cm
+
+**Results - Gradual Degradation Pattern (2009 samples):**
+
+| Configuration | N_Replaced | Type | MAE / Median | Success (≤5°) | Degradation from Baseline |
+|--------------|-----------|------|--------------|---------------|---------------------------|
+| **6cm baseline** | 0 | none | 2.82° / 2.0° | 87.8% | baseline |
+| **1x 18cm (pos1)** | 1 | 18cm | 3.34° / 2.0° | 82.2% | **+0.5° / -5.6%** |
+| **1x 18cm (pos5)** | 1 | 18cm | 4.94° / 3.0° | 76.1% | **+2.1° / -11.7%** |
+| **1x 12cm (pos5)** | 1 | 12cm | 5.92° / 3.0° | 68.1% | **+3.1° / -19.7%** |
+| **1x 12cm (pos1)** | 1 | 12cm | 6.14° / 3.0° | 68.6% | **+3.3° / -19.2%** |
+| **1x 12cm (pos3)** | 1 | 12cm | 6.19° / 4.0° | 58.4% | **+3.4° / -29.4%** |
+| **2x 18cm (opp)** | 2 | 18cm | 7.08° / 3.0° | 66.1% | **+4.3° / -21.7%** |
+| **2x 12cm (adj)** | 2 | 12cm | 10.06° / 4.0° | 57.0% | **+7.2° / -30.8%** |
+| **2x 12cm (opp)** | 2 | 12cm | 15.58° / 6.0° | 45.8% | **+12.8° / -42.0%** |
+| **12cm full** | 8 | 12cm | 68.01° / 52.0° | 4.5% | **+65.2° / -83.3%** |
+| **18cm full** | 8 | 18cm | 56.70° / 48.0° | 5.0% | **+53.9° / -82.8%** |
+
+**🎯 KEY INSIGHTS**:
+1. **18cm is MUCH more robust than 12cm**: Single 18cm replacement (pos1) causes minimal degradation (3.34° MAE, 82% success) vs single 12cm (5.92-6.19° MAE, 58-69% success)
+2. **Progressive degradation**: 0 → 1 → 2 replacements shows gradual performance loss, not catastrophic failure
+3. **Position matters significantly**: pos1 better than pos5 for 18cm (3.34° vs 4.94°), pos5 better than pos3 for 12cm
+4. **Opposite placement worse than adjacent**: 2x12cm opposite (15.58° MAE) much worse than adjacent (10.06° MAE)
+5. **Cliff edge at full replacement**: Jump from 15.58° (2 mics) to 68.01° (8 mics) for 12cm - suggests network relies on majority of original geometry
+6. **Hybrid opportunity refined**: Network remains usable with 1-2 mic replacements, especially with 18cm positions
 
 **Why This Matters**:
 - CRNN learns geometry-specific acoustic patterns during training
@@ -78,7 +111,11 @@
 
 ## Executive Summary
 
-This research pivoted from automotive environment failures (which proved intractable for classical methods) to **microphone array geometry robustness**. We discovered that CRNN exhibits catastrophic failure when tested on array geometries different from training: 12cm array shows 63.3° MAE / 54° median (90.5% failure rate), while 18cm array shows 48.9° MAE / 37° median (85.4% failure rate), compared to 4.8° MAE / 3° median on the 6cm training geometry. The non-linear degradation pattern (18cm performs better than 12cm despite being farther from training) suggests complex acoustic feature dependencies. This geometric brittleness creates a clear opportunity for hybrid systems: CRNN handles trained geometry configurations, while SRP-PHAT rescues cases with different array setups. We've achieved 80% failure detection using confidence metrics and are optimizing SRP parameters to achieve 21.5° MAE / 4.5° median for effective fallback.
+This research pivoted from automotive environment failures (which proved intractable for classical methods) to **microphone array geometry robustness**. We discovered that CRNN exhibits catastrophic failure when tested on array geometries different from training: 12cm full array shows 68.0° MAE / 52° median (95.5% failure rate), while 18cm full array shows 56.7° MAE / 48° median (95.0% failure rate), compared to 2.82° MAE / 2° median on the 6cm training geometry.
+
+**Critical new finding**: Partial microphone replacement tests reveal **gradual degradation** rather than binary failure. Single 18cm replacements cause minimal impact (3.34° MAE, 82% success), while single 12cm replacements show moderate degradation (5.92-6.19° MAE, 58-68% success). The non-linear pattern continues: 18cm positions are significantly more robust than 12cm despite being farther from training geometry. Position placement matters significantly, and there's a "cliff edge" - performance jumps from 15.58° (2 mics) to 68° (8 mics) for 12cm, suggesting the network relies on maintaining majority original geometry.
+
+This geometric brittleness creates a clear opportunity for hybrid systems: CRNN handles trained geometry configurations and partial replacements (1-2 mics), while SRP-PHAT rescues cases with severe geometric mismatch. We've achieved 80% failure detection using confidence metrics and are optimizing SRP parameters to achieve 21.5° MAE / 4.5° median for effective fallback.
 
 ## Key Findings
 
@@ -87,11 +124,16 @@ This research pivoted from automotive environment failures (which proved intract
 
 ### CRNN Geometry Brittleness (Critical Discovery)
 **CRNN fails catastrophically on different microphone array geometries**:
-- Trained on 6cm array: ~82% success rate (≤5°), 4.8° MAE / 3.0° median
-- Tested on 12cm array: **9.5% success rate, 63.3° MAE / 54.0° median** (90.5% failure rate)
-- Tested on 18cm array: **14.6% success rate, 48.9° MAE / 37.0° median** (85.4% failure rate)
+- Trained on 6cm array: **87.8% success rate (≤5°), 2.82° MAE / 2.0° median**
+- Tested on 12cm array (full): **4.5% success rate, 68.01° MAE / 52.0° median** (95.5% failure rate)
+- Tested on 18cm array (full): **5.0% success rate, 56.70° MAE / 48.0° median** (95.0% failure rate)
 - **Non-linear degradation**: 18cm performs better than 12cm despite being farther from training geometry
-- Root cause: Network learns geometry-specific acoustic features that don't transfer
+- **Gradual degradation discovered**: Partial replacements (1-2 mics) show progressive performance loss
+  - Single 18cm replacement: 3.34-4.94° MAE (82-76% success) - **network remains highly usable**
+  - Single 12cm replacement: 5.92-6.19° MAE (68-58% success) - **moderate degradation**
+  - Two 12cm replacements: 10.06-15.58° MAE (57-46% success) - **severe degradation**
+  - Full array replacement: **catastrophic failure** (~95% failure rate)
+- Root cause: Network learns geometry-specific acoustic patterns that don't transfer
 - **Opportunity**: SRP-PHAT is geometry-agnostic, can rescue these failures
 
 ### Automotive Environment Findings (Historical Context)
@@ -131,11 +173,13 @@ Analysis of CRNN failures with novel noise revealed **systematic failures in aut
 3. **Professor Guidance**: Advised to find failure modes where classical methods can actually help
 
 ### New Direction: Microphone Array Geometry Robustness
-1. **Discovered Geometric Brittleness**: CRNN fails when array geometry differs from training (85-90% failure rate at ≤5° on 12cm/18cm vs 6cm training)
-2. **Non-linear Degradation Pattern**: 12cm shows worse performance (63.3° MAE) than 18cm (48.9° MAE), suggesting complex acoustic feature dependencies rather than simple distance-based degradation
-3. **SRP Advantage**: Classical methods are geometry-agnostic - just need microphone positions
-4. **Clear Hybrid Opportunity**: CRNN for trained geometries, SRP fallback for different configurations
-5. **Practical Relevance**: Real-world deployments often use different array sizes than training data
+1. **Discovered Geometric Brittleness**: CRNN fails catastrophically when full array geometry differs from training (~95% failure rate at ≤5° on 12cm/18cm full arrays vs 6cm training)
+2. **Gradual Degradation with Partial Replacement**: Progressive performance loss with 1-2 mic replacements (3-16° MAE) before cliff edge to catastrophic failure (68° MAE) with full array change
+3. **Non-linear Degradation Pattern**: 18cm more robust than 12cm at all replacement levels (single: 3.34° vs 5.92°, double: 7.08° vs 10-15°, full: 56.7° vs 68°), suggesting complex acoustic feature dependencies
+4. **Position-Dependent Sensitivity**: Specific microphone placements (pos1 vs pos3 vs pos5) significantly impact degradation severity
+5. **SRP Advantage**: Classical methods are geometry-agnostic - just need microphone positions
+6. **Clear Hybrid Opportunity**: CRNN for trained geometries and minor variations (1-2 mics), SRP fallback for severe geometric mismatch
+7. **Practical Relevance**: Real-world deployments often use different array sizes than training data, and understanding partial degradation guides deployment decisions
 
 ## Implementation Strategy
 
@@ -157,10 +201,15 @@ Analysis of CRNN failures with novel noise revealed **systematic failures in aut
 - ✅ Ready for geometry robustness testing
 
 ### Phase 3: CRNN Geometry Robustness Testing ✅ COMPLETED
-- ✅ Tested CRNN on 6cm (training), 12cm, and 18cm arrays
-- ✅ **Critical Finding**: 85-90% failure rate (>5° error) on 12cm/18cm arrays (vs ~18% on 6cm)
-- ✅ **Non-linear Degradation**: 12cm shows 63.3° MAE / 54° median, 18cm shows 48.9° MAE / 37° median
+- ✅ Tested CRNN on 6cm (training), 12cm, and 18cm full arrays
+- ✅ **Critical Finding**: ~95% failure rate (>5° error) on full 12cm/18cm arrays (vs 12.2% on 6cm)
+- ✅ **Non-linear Degradation**: 12cm shows 68.0° MAE / 52° median, 18cm shows 56.7° MAE / 48° median
 - ✅ 18cm performs better than 12cm despite being farther from training geometry
+- ✅ **NEW: Partial replacement tests** reveal gradual degradation (1-2 mics):
+  - Single 18cm replacement: 3.34-4.94° MAE (82-76% success) - **minimal impact**
+  - Single 12cm replacement: 5.92-6.19° MAE (58-68% success) - **moderate degradation**
+  - Two 12cm replacements: 10.06-15.58° MAE (46-57% success) - **severe degradation**
+  - "Cliff edge" phenomenon: 15.58° (2 mics) → 68° (8 mics) for 12cm
 - ✅ Confirmed geometric brittleness creates hybrid opportunity
 - 🔄 Testing failure predictor on 12cm/18cm data (in progress)
 
@@ -248,7 +297,12 @@ n_dft_bins=16384, n_avg= 1, freq=200-4000Hz: MAE=23.48°, Median=6.48°
 
 ## Expected Contributions
 
-1. **Novel Discovery**: First identification of CRNN geometric brittleness - neural SSL fails catastrophically (85-90% failure rate at ≤5°) on different microphone array sizes, with non-linear degradation pattern (12cm worse than 18cm)
+1. **Novel Discovery - Geometric Brittleness**: First comprehensive study of CRNN geometric brittleness showing:
+   - Catastrophic failure (~95% failure rate at ≤5°) on full array geometry changes
+   - **Gradual degradation with partial replacements**: 1-2 mic changes show progressive loss (3-16° MAE)
+   - Non-linear degradation pattern (18cm more robust than 12cm despite being farther from training)
+   - "Cliff edge" phenomenon: network maintains functionality up to ~2 mic replacements, then catastrophic failure
+   - Position-dependent sensitivity: mic placement significantly impacts degradation severity
 2. **Confidence-Based Failure Prediction**: Real-time failure prediction using CRNN's internal confidence metrics with 80% recall and 76% precision
 3. **Practical Hybrid System**: Geometry-aware switching that addresses real-world deployment scenarios where array configurations vary
 4. **SRP Optimization Framework**: Comprehensive parameter study identifying optimal configurations for SSL fallback (21.5° MAE / 4.5° median, 70% improvement)
@@ -264,13 +318,17 @@ n_dft_bins=16384, n_avg= 1, freq=200-4000Hz: MAE=23.48°, Median=6.48°
 ## Key Technical Insights
 
 ### What Works Well
-- **CRNN on Training Geometry**: Excellent performance (~82% success at ≤5°, 4.8° MAE / 3° median) when array matches training
+- **CRNN on Training Geometry**: Excellent performance (87.8% success at ≤5°, 2.82° MAE / 2° median) when array matches training
+- **CRNN with Partial 18cm Replacements**: Minimal degradation (3.34° MAE, 82% success) with single 18cm mic replacement
 - **T60 Generalization**: CRNN robust to reverberation time variations (0.3s to 4.5s)
 - **Confidence Metrics**: Reliable real-time failure detection with simple thresholds
 - **High DFT Resolution**: 32768 bins enable precise SRP localization (21.5° MAE / 4.5° median)
 
 ### Critical Limitations
-- **CRNN Geometric Brittleness**: Catastrophic failure (90.5% error rate >5°) on different array sizes
+- **CRNN Full Array Geometry Change**: Catastrophic failure (95% error rate >5°) on complete array size changes
+- **Progressive Geometric Degradation**: Performance degrades with number of replaced mics (1→2→8)
+- **12cm More Sensitive than 18cm**: Unexpected non-linear pattern - intermediate geometry more problematic
+- **Position-Dependent Sensitivity**: Specific microphone locations have varying impact on performance
 - **Training Data Dependency**: CRNN learns geometry-specific acoustic patterns
 - **SRP Baseline Performance**: Poor accuracy (~70° MAE / ~60° median) without optimization
 - **Automotive+Noise Challenge**: Intractable for both CRNN and classical methods
@@ -288,7 +346,11 @@ n_dft_bins=16384, n_avg= 1, freq=200-4000Hz: MAE=23.48°, Median=6.48°
 
 ### Key Research Questions
 1. ✅ **Can we predict CRNN failures from network outputs?** YES - 80% recall using max_prob metric
-2. ✅ **Does CRNN generalize to different array geometries?** NO - 85-90% failure rate (>5°) on 12cm/18cm vs 6cm training, with non-linear degradation (18cm better than 12cm)
+2. ✅ **Does CRNN generalize to different array geometries?**
+   - Full array change: NO - ~95% failure rate (>5°) on 12cm/18cm full arrays vs 6cm training
+   - Partial replacement: PARTIALLY - gradual degradation with 1-2 mics (3-16° MAE), usable with 18cm
+   - Non-linear pattern: 18cm more robust than 12cm despite being farther from training
+   - Position matters: mic location significantly impacts degradation severity
 3. 🔄 **Can SRP-PHAT rescue geometric mismatch failures?** Testing - optimized SRP shows 21.5° MAE / 4.5° median on samples
 4. 📋 **Can we build a geometry-aware hybrid system?** Next - validation pending Phase 2 SRP results
 
