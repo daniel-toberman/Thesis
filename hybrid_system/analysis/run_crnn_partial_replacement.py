@@ -92,6 +92,54 @@ CONFIGURATIONS = [
         'replacement_type': '18cm'
     },
 
+    # Replace 3 mics with 12cm positions
+    {
+        'name': '6cm_3x12cm_alternating',
+        'mics': [9, 2, 11, 4, 13, 6, 7, 8, 0],
+        'description': 'Replace mics 1,3,5 with 9,11,13 (12cm, alternating)',
+        'n_replaced': 3,
+        'replacement_type': '12cm'
+    },
+    {
+        'name': '6cm_3x12cm_consecutive',
+        'mics': [9, 10, 11, 4, 5, 6, 7, 8, 0],
+        'description': 'Replace mics 1,2,3 with 9,10,11 (12cm, consecutive)',
+        'n_replaced': 3,
+        'replacement_type': '12cm'
+    },
+
+    # Replace 4 mics with 12cm positions
+    {
+        'name': '6cm_4x12cm_opposite_pairs',
+        'mics': [9, 2, 11, 4, 13, 6, 15, 8, 0],
+        'description': 'Replace mics 1,3,5,7 with 9,11,13,15 (12cm, opposite pairs)',
+        'n_replaced': 4,
+        'replacement_type': '12cm'
+    },
+    {
+        'name': '6cm_4x12cm_half_consecutive',
+        'mics': [9, 10, 11, 12, 5, 6, 7, 8, 0],
+        'description': 'Replace mics 1,2,3,4 with 9,10,11,12 (12cm, half array)',
+        'n_replaced': 4,
+        'replacement_type': '12cm'
+    },
+
+    # Replace 3-4 mics with 18cm positions
+    {
+        'name': '6cm_3x18cm_alternating',
+        'mics': [17, 2, 19, 4, 21, 6, 7, 8, 0],
+        'description': 'Replace mics 1,3,5 with 17,19,21 (18cm, alternating)',
+        'n_replaced': 3,
+        'replacement_type': '18cm'
+    },
+    {
+        'name': '6cm_4x18cm_opposite_pairs',
+        'mics': [17, 2, 19, 4, 21, 6, 23, 8, 0],
+        'description': 'Replace mics 1,3,5,7 with 17,19,21,23 (18cm, opposite pairs)',
+        'n_replaced': 4,
+        'replacement_type': '18cm'
+    },
+
     # Full array replacements for comparison
     {
         'name': '12cm_full',
