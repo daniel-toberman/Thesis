@@ -31,9 +31,9 @@ CSV_PATH = "/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/test/test_sta
 SRP_GRID_CELLS = 720
 SRP_MODE = "gcc_phat_freq"   # Try time domain - might be better for small arrays
 N_AVG_SAMPLES = 10
-N_DFT_BINS = 2**12
+N_DFT_BINS = 16384
 FREQ_MIN = 300              # Minimum frequency in Hz
-FREQ_MAX = 3000             # Maximum frequency in Hz
+FREQ_MAX = 4000             # Maximum frequency in Hz (updated for hybrid system)
 
 # Bandpass filter settings
 FILTER_ORDER = 6            # Butterworth filter order
@@ -322,8 +322,8 @@ def main():
 
     # Array diameter selection
     p.add_argument("--array_diameter", type=str, default="6cm",
-                  choices=["6cm", "12cm", "18cm"],
-                  help="Microphone array diameter: 6cm (mics 0-8), 12cm (mics 0,9-16), 18cm (mics 0,17-24)")
+                  choices=["6cm", "12cm", "18cm", "3x12cm_consecutive"],
+                  help="Microphone array diameter: 6cm (mics 0-8), 12cm (mics 0,9-16), 18cm (mics 0,17-24), 3x12cm_consecutive (mics 0,9,10,11,4,5,6,7,8)")
 
     # Bandpass filter arguments
     p.add_argument("--enable_bandpass", action="store_true", default=True,
@@ -351,6 +351,8 @@ def main():
         use_mic_id = [0] + list(range(9, 17))  # 12cm diameter: 0, 9-16
     elif args.array_diameter == "18cm":
         use_mic_id = [0] + list(range(17, 25))  # 18cm diameter: 0, 17-24
+    elif args.array_diameter == "3x12cm_consecutive":
+        use_mic_id = [0, 9, 10, 11, 4, 5, 6, 7, 8]  # 3x12cm consecutive: mics 1,2,3 replaced with 9,10,11
 
     # Calculate microphone positions based on selected array
     mic_positions = audiowu_high_array_geometry()[use_mic_id, :2]
@@ -418,7 +420,7 @@ def main():
         results.append(res)
 
     if len(rows) > 1:
-        out_csv = Path(CSV_PATH).with_name(Path(CSV_PATH).stem + "_srp_results.csv")
+        out_csv = Path(CSV_PATH).with_name(Path(CSV_PATH).stem + f"_srp_{args.array_diameter}_results.csv")
         pd.DataFrame(results).to_csv(out_csv, index=False)
         print(f"\nSaved results to: {out_csv}")
     else:
