@@ -628,3 +628,387 @@ n_dft_bins=16384, n_avg= 1, freq=200-4000Hz: MAE=23.48°, Median=6.48°
 
 ### Recommendation
 The hybrid system works and delivers meaningful improvements. The approach is **thesis-worthy** with clear contributions in geometric robustness characterization, confidence-based failure detection, and validated hybrid SSL. Simple and effective - ready to write up.
+
+---
+
+## Future Work - Advanced Failure Detection (Beyond Simple Thresholds)
+
+### Current Limitation
+
+The current hybrid system uses a simple confidence threshold (max_prob < 0.04) for routing decisions, achieving 71.8% routing accuracy. While effective, this approach has limitations:
+
+- **Limited novelty** for publication (single-metric threshold)
+- **Cannot explain WHY** failures occur (black-box decision)
+- **Doesn't leverage** rich CRNN internal representations (penultimate features, hidden states)
+- **Treats angles linearly** despite circular topology (1° and 359° treated as maximally different, not 2° apart)
+- **No learning** from failure patterns in training data
+
+### Proposed Sophisticated Approaches
+
+To advance this work toward publication-quality research, we propose implementing and comparing multiple sophisticated failure detection methods that go beyond simple thresholding.
+
+---
+
+### Tier 1: Core Methods (Highest Priority)
+
+#### 1. ConfidNet: Learned Confidence Estimation
+
+**Method**: Train a secondary neural network that takes CRNN's penultimate features (256-dim) and predictions (360-dim) as input and outputs P(correct | features, prediction).
+
+**Citation**: Corbière et al. 2019, "Addressing Failure Prediction by Learning Model Confidence" (NeurIPS)
+
+**Implementation**:
+```python
+class ConfidenceNetwork(nn.Module):
+    def __init__(self):
+        self.confidence_net = nn.Sequential(
+            nn.Linear(256 + 360, 128),
+            nn.ReLU(), nn.Dropout(0.3),
+            nn.Linear(128, 64), nn.ReLU(),
+            nn.Linear(64, 1), nn.Sigmoid()
+        )
+```
+
+**Advantages**:
+- Learns complex failure patterns from training data
+- Uses rich internal representations (already have forward_with_intermediates())
+- 2024 validation: "ConfidNet consistently outperforms MCP, entropy, and recent failure prediction methods"
+
+**Expected Performance**: 78-85% routing accuracy (vs current 71.8%)
+
+**Novelty**: First application to spatial audio localization domain
+
+**Timeline**: 1 week (extends existing train_failure_predictor.py)
+
+---
+
+#### 2. Circular Statistics for Directional Predictions
+
+**Method**: Replace linear confidence metrics (entropy, variance) with directional statistics appropriate for circular data: von Mises distribution, circular variance, concentration parameter κ.
+
+**Citations**:
+- Mardia & Jupp 2000, "Directional Statistics" (textbook - foundational theory)
+- Hernández-Stumpfhauser et al. 2017, "The General Projected Normal Distribution of Arbitrary Dimension"
+
+**Problem with Current Approach**:
+- Linear entropy/variance treat 1° and 359° as maximally different
+- Should be only 2° apart (circular topology)
+- 0°/360° boundary causes discontinuities
+
+**Circular Metrics to Compute**:
+- **Circular variance**: (1 - R) where R is mean resultant length
+  - R ≈ 1: highly concentrated (confident)
+  - R ≈ 0: uniform (uncertain)
+- **Von Mises concentration**: κ (inverse of circular variance)
+  - κ → 0: uniform distribution
+  - κ >> 1: highly concentrated
+- **Circular standard deviation**: σ_circular = √(-2 ln R)
+
+**Implementation**:
+```python
+def circular_variance(prob_dist):
+    angles = np.arange(360) * np.pi / 180
+    R = np.sqrt(
+        (np.sum(prob_dist * np.cos(angles)))**2 +
+        (np.sum(prob_dist * np.sin(angles)))**2
+    )
+    return 1 - R  # 0 = concentrated, 1 = uniform
+```
+
+**Novelty**: Very high - rarely applied in deep learning, mathematically principled
+
+**Expected Impact**: Better separation between confident and uncertain predictions, especially near 0°/360° boundary
+
+**Timeline**: 2-3 days (add to confidence extraction)
+
+---
+
+#### 3. Mahalanobis Distance on Penultimate Features
+
+**Method**: Measure out-of-distribution (OOD) distance in CRNN's 256-dim penultimate layer feature space using class-conditional Gaussians.
+
+**Citation**: Lee et al. 2018, "A Simple Unified Framework for Detecting Out-of-Distribution Samples and Adversarial Attacks" (NeurIPS)
+
+**Key Insight**: Geometric mismatch (6cm → 12cm array) likely creates separable clusters in feature space. Mahalanobis distance quantifies how far a test sample is from the training distribution.
+
+**Algorithm**:
+1. Extract penultimate features from training data (already have forward_with_intermediates())
+2. For each angle class c, compute mean μ_c and covariance Σ_c
+3. Test time: compute Mahalanobis distance to nearest class
+   - d_M(x, c) = (x - μ_c)^T Σ_c^(-1) (x - μ_c)
+   - OOD score = min_c d_M(x, c)
+4. High distance → OOD → likely failure
+
+**2024 Guidance**: "Dimensionality reduction (PCA to 32-64 dims) improves Mahalanobis performance for near-OOD detection"
+
+**Advantages**:
+- No model retraining required
+- Interpretable: Can visualize 6cm vs 12cm feature space separation (t-SNE plots)
+- Geometric mismatch creates feature space shift
+
+**Expected Performance**: 75-80% routing accuracy
+
+**Timeline**: 2-3 days
+
+---
+
+#### 4. Temperature Scaling (Calibration Baseline)
+
+**Method**: Learn single scalar parameter T that recalibrates confidence scores: p_calibrated = softmax(logits / T)
+
+**Citation**: Guo et al. 2017, "On Calibration of Modern Neural Networks" (ICML)
+
+**Justification**:
+- Essential baseline for all confidence-based methods
+- 2024 guidance: "Use temperature scaling with deep ensembles for gold standard calibration"
+- Dramatically reduces Expected Calibration Error (ECE)
+
+**Implementation**:
+```python
+# Optimize T on validation set to minimize NLL
+class TemperatureScaling(nn.Module):
+    def __init__(self):
+        self.temperature = nn.Parameter(torch.ones(1))
+```
+
+**Advantages**:
+- Post-hoc method (no model retraining)
+- Single parameter (fast optimization)
+- Improves all downstream confidence-based decisions
+
+**Timeline**: 1 day
+
+---
+
+### Tier 2: Additional Methods (If Time Permits)
+
+#### 5. Monte Carlo (MC) Dropout
+
+**Method**: Run inference multiple times (T=10-30) with dropout enabled, measure prediction variance across stochastic forward passes.
+
+**Citation**: Gal & Ghahramani 2016, "Dropout as a Bayesian Approximation" (ICML)
+
+**Advantage**: Already have dropout (0.4) in GRU layer (CRNN.py line 41), minimal code changes
+
+**Epistemic Uncertainty**: Variance across T forward passes indicates model uncertainty (not just data noise)
+
+**2024 Validation**: "MC dropout + temperature scaling reduces ECE by 45-66%"
+
+**Cost**: 10-30x inference time (can be parallelized)
+
+**Timeline**: 1-2 days
+
+---
+
+#### 6. SNGP (Spectral-Normalized Neural Gaussian Process)
+
+**Method**:
+1. Apply spectral normalization to hidden layer weights (enforces Lipschitz smoothness)
+2. Replace final layer with Gaussian Process layer
+3. Provides distance-awareness: predictions less confident for inputs far from training data
+
+**Citation**: Liu et al. 2020, "Simple and Principled Uncertainty Estimation with Deterministic Deep Learning via Distance Awareness" (NeurIPS)
+
+**Key Property**: "Strong out-of-domain detection due to distance-awareness" - perfect for geometric mismatch!
+
+**2024 Status**: "Minimax optimal uncertainty under distance-awareness conditions"
+
+**Advantages**:
+- Single model (no ensemble overhead)
+- Similar latency to deterministic network
+- Excellent OOD properties
+
+**Challenges**: Requires architecture modification + retraining
+
+**Timeline**: 1 week
+
+---
+
+#### 7. Energy-Based OOD Detection
+
+**Method**: Compute energy score from logits: E(x) = -log Σ exp(logit_i)
+
+**Citation**: Liu et al. 2020, "Energy-based Out-of-distribution Detection" (NeurIPS)
+
+**Advantage**:
+- Fast (single forward pass)
+- Uses pre-sigmoid logits (already available: logits_pre_sig in forward_with_intermediates)
+- Often outperforms maximum softmax probability
+
+**Implementation**: One line of code
+```python
+energy_score = -torch.logsumexp(logits_pre_sig, dim=-1)
+```
+
+**Timeline**: < 1 day
+
+---
+
+#### 8. K-Nearest Neighbors (KNN) in Feature Space
+
+**Method**: Compute distance from test sample's penultimate features to K nearest training samples
+
+**Citation**: Sun et al. 2022, "Out-of-Distribution Detection with Deep Nearest Neighbors" (CVPR)
+
+**Advantages**:
+- Non-parametric (no distributional assumptions)
+- Simpler than Mahalanobis
+- 2024: "KNN-based OOD detection benefits from high-quality embedding space"
+
+**Implementation**: sklearn.neighbors.NearestNeighbors
+
+**Timeline**: 1-2 days
+
+---
+
+### Tier 3: Interpretability & Comparison Methods
+
+#### 9. Deep Ensembles (Baseline Comparison)
+
+**Method**: Train 3-5 independent CRNN models with different random initializations, aggregate predictions
+
+**Citation**: Lakshminarayanan et al. 2017, "Simple and Scalable Predictive Uncertainty Estimation using Deep Ensembles" (NeurIPS)
+
+**Status**: "Gold standard for uncertainty quantification" (2024 research)
+
+**Advantages**:
+- Explores multiple loss landscape basins (vs MC dropout's single basin)
+- Outperforms MC dropout in OOD settings
+
+**Disadvantages**:
+- 3-5x training time
+- 3-5x storage
+- 3-5x inference cost
+
+**Use**: Comparison baseline to validate single-model methods
+
+**Timeline**: 1 week (if computational resources available)
+
+---
+
+#### 10. Attention Mechanisms for Interpretability
+
+**Method**: Add attention layer to RNN output, visualize which IPD (inter-phase difference) features and time-frequency bins drive predictions
+
+**Goal**: Explain WHY geometric mismatch causes failures
+- Which frequency regions matter?
+- Do 6cm and 12cm attend to different features?
+- Can attention entropy predict failures?
+
+**Implementation**: Add nn.MultiheadAttention to CRNN architecture
+
+**Advantages**:
+- High interpretability
+- Novel for spatial audio domain
+- 2024: "Attention provides interpretable patterns for key features"
+
+**Challenges**: Requires architecture modification + retraining
+
+**Timeline**: 1 week
+
+---
+
+### Related Domain-Specific Work
+
+**Microphone Array / Spatial Audio**:
+- "Multi-pitch Estimation meets Microphone Mismatch: Applicability of Domain Adaptation" (2024 ISMIR)
+  - Relevant: Domain shift from changing microphone configuration
+  - Transfer learning for mic mismatch
+
+**Fault/Failure Prediction**:
+- Meta-learning for RUL (Remaining Useful Life) prediction (2024)
+  - "MAML predominant for RUL prediction with few samples"
+  - Cross-domain failure prediction
+
+**Acoustic Classification under Distribution Shift**:
+- "Multi-source domain adaptation for acoustic classification" (2024)
+- Relevant for understanding acoustic feature shifts
+
+---
+
+### Expected Contributions
+
+1. **Novel Application**: First application of learned confidence (ConfidNet) to spatial audio localization
+
+2. **Methodological Innovation**: First use of circular statistics in deep learning uncertainty quantification for directional predictions
+
+3. **Systematic Analysis**: Comprehensive study of geometric mismatch as distribution shift in neural network feature space
+
+4. **Performance Improvement**: 10-15% improvement in routing accuracy (71.8% → 80-85%)
+
+5. **Interpretability**: Feature space visualization (t-SNE) revealing how geometric mismatch affects representations
+
+6. **Comparison Framework**: Comprehensive evaluation across calibration, OOD detection, and learned confidence methods
+
+---
+
+### Implementation Roadmap (3-4 weeks)
+
+**Week 1: Baselines & Quick Wins**
+- Day 1: Temperature scaling (calibration)
+- Day 2: MC Dropout (epistemic uncertainty)
+- Day 3-4: Mahalanobis distance on features (OOD detection)
+- Day 5: Circular statistics (directional metrics)
+- **Deliverable**: 4 baseline methods, initial performance comparison
+
+**Week 2: Core Novel Contribution**
+- Day 1-2: ConfidNet architecture design and data preparation
+- Day 3-4: Train ConfidNet on training data (penultimate features + predictions → P(correct))
+- Day 5: Hyperparameter tuning and validation
+- **Deliverable**: ConfidNet model achieving 78-85% routing accuracy
+
+**Week 3: Evaluation & Analysis**
+- Day 1-2: Comprehensive evaluation on test set (all methods)
+- Day 3: Ablation studies (feature importance, metric combinations)
+- Day 4: Visualization (feature space t-SNE, confusion matrices, error distributions)
+- Day 5: Statistical analysis and comparison
+- **Deliverable**: Complete experimental results, publication-ready figures
+
+**Week 4 (Optional): Advanced Methods**
+- Option A: SNGP implementation (if resources permit)
+- Option B: Attention mechanisms for interpretability
+- Option C: Additional experiments based on Week 3 findings
+- **Deliverable**: Extended experiments for journal version
+
+---
+
+### Key Papers to Read
+
+**Must Read (Core Methods)**:
+1. Corbière et al. 2019 - "Addressing Failure Prediction by Learning Model Confidence" (NeurIPS) - **ConfidNet**
+2. Lee et al. 2018 - "A Simple Unified Framework for Detecting Out-of-Distribution Samples and Adversarial Attacks" (NeurIPS) - **Mahalanobis**
+3. Guo et al. 2017 - "On Calibration of Modern Neural Networks" (ICML) - **Temperature Scaling**
+4. Mardia & Jupp 2000 - "Directional Statistics" (textbook) - **Circular Statistics Theory**
+
+**Should Read (Baselines & Comparisons)**:
+5. Lakshminarayanan et al. 2017 - "Simple and Scalable Predictive Uncertainty Estimation using Deep Ensembles" (NeurIPS) - **Gold Standard**
+6. Gal & Ghahramani 2016 - "Dropout as a Bayesian Approximation" (ICML) - **MC Dropout**
+7. Liu et al. 2020 - "Simple and Principled Uncertainty Estimation with Deterministic Deep Learning via Distance Awareness" (NeurIPS) - **SNGP**
+
+**Additional References**:
+8. Liu et al. 2020 - "Energy-based Out-of-distribution Detection" (NeurIPS)
+9. Sun et al. 2022 - "Out-of-Distribution Detection with Deep Nearest Neighbors" (CVPR)
+10. Hernández-Stumpfhauser et al. 2017 - "The General Projected Normal Distribution of Arbitrary Dimension"
+
+---
+
+### Publication Strategy
+
+**Title Suggestion**: "Uncertainty-Aware Failure Prediction for Deep Learning Sound Localization Under Geometric Mismatch: A Learned Confidence Approach"
+
+**Main Contributions**:
+1. Learned confidence estimation from penultimate features (ConfidNet adaptation)
+2. Circular statistics for proper directional uncertainty quantification
+3. Feature-space OOD detection for geometric mismatch
+4. Comprehensive comparison framework
+5. 80-85% routing accuracy (vs 71.8% threshold baseline)
+
+**Novelty Angle**:
+- First systematic study of neural network failure detection for spatial audio under sensor mismatch
+- Demonstrates that geometric mismatch creates learnable failure patterns in feature space
+- Proposes domain-appropriate metrics (circular statistics) for angular predictions
+
+**Target Venues**:
+- Audio/speech conferences: ICASSP, INTERSPEECH, ISMIR
+- Machine learning: NeurIPS workshops (Reliable ML, Uncertainty & Robustness)
+- Signal processing: IEEE Signal Processing Letters, EURASIP JASP
