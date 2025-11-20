@@ -1,0 +1,24 @@
+# Large feature files (can be regenerated)
+features/
+*.npz
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Large pipeline results
+results/pipeline_results.npz
+
+# OS files
+.DS_Store
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
