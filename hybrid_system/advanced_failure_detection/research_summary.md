@@ -496,6 +496,7 @@ Based on "Generalized Out-of-Distribution Detection: A Survey", we implemented a
 | **KNN k=10** | Post-hoc OOD | 30.0% | 0.526 | 14.73° | **4.72°** | 50.7% | -0.67° |
 | MC Dropout Entropy | Post-hoc OOD | 30.0% | 0.557 | 15.16° | 5.35° | 48.0% | -0.25° |
 | Energy OOD | Post-hoc OOD | 30.1% | 0.552 | 15.27° | 6.72° | 46.4% | -0.14° |
+| **LLR GMM-5** | Density-based | 30.0% | 0.486 | 15.34° | 5.19° | 49.0% | -0.07° |
 | **CRNN-only** | Baseline | 0% | - | 15.41° | 8.16° | 38.4% | 0.0° |
 | **DICE (90%)** | Post-hoc OOD | 30.0% | 0.361 | 15.54° ❌ | 6.30° | 44.4% | +0.13° |
 | ReAct p85 | Post-hoc OOD | 30.0% | 0.387 | 17.32° ❌ | 5.94° | 45.4% | +1.91° |
@@ -506,6 +507,7 @@ Based on "Generalized Out-of-Distribution Detection: A Survey", we implemented a
 **Method Categories:**
 - **Supervised**: Trained on labeled failure data (ConfidNet)
 - **Post-hoc OOD**: Out-of-distribution detection, no retraining required
+- **Density-based**: Likelihood ratio using trained density model (GMM on training data)
 - **Simple Baseline**: Direct threshold on model confidence (max softmax probability)
 - **Baseline**: CRNN without routing
 
@@ -543,8 +545,9 @@ Based on "Generalized Out-of-Distribution Detection: A Survey", we implemented a
 7. **KNN k=10 (14.73°)** - Nearest neighbor distance
 8. MC Dropout (15.16°) - Bayesian uncertainty
 9. Energy OOD (15.27°) - Energy-based
-10. **CRNN-only (15.41°)** - Baseline
-11. Methods that hurt performance: DICE 90% (15.54°), ReAct (17.32°), Mahalanobis (17.16°)
+10. **LLR GMM-5 (15.34°)** - Likelihood ratio (barely better than baseline)
+11. **CRNN-only (15.41°)** - Baseline
+12. Methods that hurt performance: DICE 90% (15.54°), LLR GMM-10/15/20 (16.6-17.2°), ReAct (17.32°), Mahalanobis (17.16°)
 
 **3. 💡 F1 score is NOT predictive of hybrid MAE**:
 - VIM: F1=0.501, MAE=13.00° (BEST)
@@ -560,12 +563,23 @@ Based on "Generalized Out-of-Distribution Detection: A Survey", we implemented a
 - **Lesson**: Don't overcomplicate! Simple confidence thresholding is a strong baseline
 - However, still 0.90° behind VIM and 1.28° behind ConfidNet
 
-**5. ⚠️ Three methods hurt performance**:
+**5. ⚠️ Multiple methods hurt performance**:
 - **ReAct p85**: 17.32° MAE (1.91° worse than CRNN-only)
 - **Mahalanobis alone**: 17.16° MAE (1.75° worse)
+- **LLR GMM-10/15/20**: 16.6-17.2° MAE (1.2-1.8° worse)
 - **DICE 90%**: 15.54° MAE (0.13° worse)
 - Low routing precision means routing too many correct predictions
 - **Lesson**: OOD detection alone insufficient without task calibration
+
+**5b. 🔬 Why LLR (Likelihood Ratio) fails**:
+- **LLR detects distribution shift, NOT task difficulty**
+- Test samples are from SAME distribution as training (3x12cm in training data)
+- High-likelihood samples can still have high errors (in-distribution but difficult)
+- Low-likelihood samples might be correctly predicted (unusual but easy)
+- **Best LLR (GMM-5): 15.34° MAE** - barely better than CRNN-only
+- More GMM components = worse (overfitting to training distribution)
+- Very low recall (0.36) - missing most failures
+- **Lesson**: Task-difficulty ≠ Out-of-distribution in regression problems
 
 **6. 📊 Survey paper insights VALIDATED**:
 - ✅ **"Post-hoc methods work without retraining"** - VIM/SHE prove this
@@ -573,6 +587,7 @@ Based on "Generalized Out-of-Distribution Detection: A Survey", we implemented a
 - ✅ **"Pattern matching efficient"** - SHE achieves 2nd best with simple approach
 - ✅ **"KNN maintains good performance"** - KNN k=10 solid 7th place
 - ⚠️ **"Supervised methods best"** - ConfidNet (12.62°) still leads, but VIM closes gap to 0.38°
+- ❌ **"Likelihood methods ineffective"** - LLR barely better than baseline, validates task≠OOD
 
 **7. 🔍 Why VIM succeeds**:
 - Captures 99% variance in just 7 principal dimensions (out of 360 logit dims)
@@ -630,11 +645,14 @@ Based on "Generalized Out-of-Distribution Detection: A Survey", we implemented a
 - **KNN k=10** - Solid performance (14.73°), high precision (0.803), best median among OOD methods
 
 **Methods to Avoid**:
+- ❌ **LLR (Likelihood Ratio)** - Barely better than baseline (15.34°); requires training GMM
+  - Detects distribution shift, not task difficulty
+  - More components hurt (GMM-10/15/20 worse than CRNN-only)
 - ❌ **ReAct alone** - Hurts performance (17.32°); paper suggests combining with Energy OOD
 - ❌ **Mahalanobis standalone** - Hurts performance (17.16°); needs calibration
 - ❌ **DICE (90%)** - Slightly worse than CRNN-only (15.54° vs 15.41°)
 - ❌ **MC Dropout** - Outperformed by simpler methods despite higher F1
-- ❌ **Energy OOD** - Outperformed by VIM/SHE/GradNorm/KNN
+- ❌ **Energy OOD** - Outperformed by VIM/SHE/GradNorm/KNN/MaxProb
 
 **Future Work**:
 1. **Test VIM + SHE + GradNorm ensemble** - All three detect different patterns
