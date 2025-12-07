@@ -170,20 +170,15 @@ Will compare against simple threshold-based routing:
 
 ## Hybrid Performance Results
 
-### Comprehensive Results Table
+### Early Results Summary
 
-| Configuration | Thresholds | Routing % | N Routed | Hybrid MAE | Δ MAE | Hybrid Median | Δ Median | Hybrid Success | Δ Success | F1 Score | FP Rate |
-|---------------|------------|-----------|----------|------------|-------|---------------|----------|----------------|-----------|----------|---------|
-| **CRNN-only** | - | 0% | 0 | 15.41° | - | 8.16° | - | 38.4% | - | - | - |
-| **ConfidNet 30°** | conf<0.3, err=30° | 21.4% | 429 | **12.12°** | **-3.29°** | 4.94° | -3.22° | 50.5% | +12.0% | 0.689 | 10.8% |
-| **Oracle 25%** | worst 25% by error | 25.0% | 502 | **9.95°** | **-5.45°** | 4.06° | -4.11° | 55.7% | +17.3% | 0.577 | 0% |
-| **Temp+Mahal** | conf<0.1, dist>17.9 | 27.7% | 557 | 13.46° | -1.95° | 4.50° | -3.66° | 52.0% | +13.6% | 0.576 | 16.0% |
-| **Energy OOD** | energy<-0.98, T=1.58 | 30.0% | 603 | 13.05° | -2.35° | 4.06° | -4.10° | 53.8% | +15.3% | 0.552 | 12.3% |
-| **MC Dropout** | entropy>4.12 | 30.0% | 603 | 13.03° | -2.38° | 4.06° | -4.10° | 54.0% | +15.6% | 0.557 | 11.8% |
-| **ConfidNet 20°** | conf<0.3, err=20° | 30.2% | 606 | 12.62° | -2.78° | **3.52°** | **-4.64°** | **56.3%** | **+17.9%** | 0.729 | 14.8% |
-| **Oracle 30%** | worst 30% by error | 30.0% | 602 | 10.45° | -4.96° | **3.56°** | **-4.60°** | **58.4%** | **+20.0%** | 0.655 | 0% |
+*See "Complete Hybrid Results Comparison - All Methods" section below for the comprehensive table with all 17 methods tested.*
 
-**Note**: err = error threshold used during training to define failures; Oracle uses perfect knowledge of ground truth errors
+**Key Early Findings:**
+- **ConfidNet 30°** (21.4% routing): 12.12° MAE, best efficiency
+- **ConfidNet 20°** (30.2% routing): 12.62° MAE, best overall
+- **Oracle baselines**: 9.95° (25%) and 10.45° (30%) show theoretical limits
+- **Temp+Mahal**: 13.46° MAE, dual-signal approach with moderate improvement
 
 ### Method Descriptions
 
@@ -485,27 +480,35 @@ Based on "Generalized Out-of-Distribution Detection: A Survey", we implemented a
 
 ### Complete Hybrid Results Comparison - All Methods
 
-| Method | Type | Routing | F1 Score | Hybrid MAE | Hybrid Median | Success (≤5°) | Δ MAE |
-|--------|------|---------|----------|------------|---------------|---------------|-------|
-| **ConfidNet 20°** | Supervised | 30.0% | **0.729** | **12.62°** | **4.34°** | **56.3%** | **-2.79°** |
-| **VIM** ⭐ | Post-hoc OOD | 30.0% | 0.501 | **13.00°** | **4.39°** | **52.6%** | **-2.41°** |
-| **SHE** ⭐ | Post-hoc OOD | 30.0% | 0.496 | **13.24°** | **4.84°** | 50.8% | **-2.17°** |
-| **GradNorm** | Post-hoc OOD | 30.0% | 0.429 | **13.86°** | **5.74°** | 47.9% | **-1.54°** |
-| **MaxProb** 📊 | Simple Baseline | 30.0% | 0.546 | **13.90°** | **4.06°** | **53.6%** | **-1.51°** |
-| **DICE (80%)** | Post-hoc OOD | 30.0% | 0.317 | 14.46° | 6.61° | 41.5% | -0.94° |
-| **KNN k=10** | Post-hoc OOD | 30.0% | 0.526 | 14.73° | **4.72°** | 50.7% | -0.67° |
-| MC Dropout Entropy | Post-hoc OOD | 30.0% | 0.557 | 15.16° | 5.35° | 48.0% | -0.25° |
-| Energy OOD | Post-hoc OOD | 30.1% | 0.552 | 15.27° | 6.72° | 46.4% | -0.14° |
-| **LLR GMM-5** | Density-based | 30.0% | 0.486 | 15.34° | 5.19° | 49.0% | -0.07° |
-| **CRNN-only** | Baseline | 0% | - | 15.41° | 8.16° | 38.4% | 0.0° |
-| **DICE (90%)** | Post-hoc OOD | 30.0% | 0.361 | 15.54° ❌ | 6.30° | 44.4% | +0.13° |
-| ReAct p85 | Post-hoc OOD | 30.0% | 0.387 | 17.32° ❌ | 5.94° | 45.4% | +1.91° |
-| Mahalanobis (alone) | Post-hoc OOD | 30.0% | 0.411 | 17.16° ❌ | 6.65° | 43.6% | +1.75° |
+**All 17 methods tested, ranked by Hybrid MAE:**
 
-⭐ = Best new methods | 📊 = Simple baseline | ❌ = Worse than CRNN-only baseline
+| Rank | Method | Type | Routing | F1 Score | Hybrid MAE | Hybrid Median | Success (≤5°) | Δ MAE |
+|------|--------|------|---------|----------|------------|---------------|---------------|-------|
+| 🥇 1 | **Oracle 25%** 🎯 | Theoretical | 25.0% | 0.577 | **9.95°** | **4.06°** | 55.7% | **-5.45°** |
+| 🥈 2 | **Oracle 30%** 🎯 | Theoretical | 30.0% | 0.655 | **10.45°** | **3.56°** | **58.4%** | **-4.96°** |
+| 🥉 3 | **ConfidNet 30°** | Supervised | 21.4% | 0.689 | **12.12°** | 4.94° | 50.5% | **-3.29°** |
+| 4 | **ConfidNet 20°** | Supervised | 30.2% | **0.729** | **12.62°** | **3.52°** | **56.3%** | **-2.79°** |
+| 5 | **VIM** ⭐ | Post-hoc OOD | 30.0% | 0.501 | **13.00°** | 4.39° | 52.6% | **-2.41°** |
+| 6 | **SHE** ⭐ | Post-hoc OOD | 30.0% | 0.496 | **13.24°** | 4.84° | 50.8% | **-2.17°** |
+| 7 | **Temp+Mahal** | Dual-Signal | 27.7% | 0.576 | 13.46° | 4.50° | 52.0% | -1.95° |
+| 8 | **GradNorm** | Post-hoc OOD | 30.0% | 0.429 | **13.86°** | 5.74° | 47.9% | **-1.54°** |
+| 9 | **MaxProb** 📊 | Simple Baseline | 30.0% | 0.546 | **13.90°** | **4.06°** | **53.6%** | **-1.51°** |
+| 10 | **DICE (80%)** | Post-hoc OOD | 30.0% | 0.317 | 14.46° | 6.61° | 41.5% | -0.94° |
+| 11 | **KNN k=10** | Post-hoc OOD | 30.0% | 0.526 | 14.73° | 4.72° | 50.7% | -0.67° |
+| 12 | MC Dropout Entropy | Post-hoc OOD | 30.0% | 0.557 | 15.16° | 5.35° | 48.0% | -0.25° |
+| 13 | Energy OOD | Post-hoc OOD | 30.1% | 0.552 | 15.27° | 6.72° | 46.4% | -0.14° |
+| 14 | **LLR GMM-5** | Density-based | 30.0% | 0.486 | 15.34° | 5.19° | 49.0% | -0.07° |
+| 📍 | **CRNN-only** | Baseline | 0% | - | 15.41° | 8.16° | 38.4% | 0.0° |
+| ❌ 15 | **DICE (90%)** | Post-hoc OOD | 30.0% | 0.361 | 15.54° | 6.30° | 44.4% | +0.13° |
+| ❌ 16 | Mahalanobis (alone) | Post-hoc OOD | 30.0% | 0.411 | 17.16° | 6.65° | 43.6% | +1.75° |
+| ❌ 17 | ReAct p85 | Post-hoc OOD | 30.0% | 0.387 | 17.32° | 5.94° | 45.4% | +1.91° |
+
+🎯 = Theoretical upper bounds | ⭐ = Best new methods | 📊 = Simple baseline | ❌ = Worse than CRNN-only baseline
 
 **Method Categories:**
+- **Theoretical**: Oracle baselines with perfect knowledge (impossible in practice, shows upper bounds)
 - **Supervised**: Trained on labeled failure data (ConfidNet)
+- **Dual-Signal**: Combined calibrated confidence + Mahalanobis distance with OR logic
 - **Post-hoc OOD**: Out-of-distribution detection, no retraining required
 - **Density-based**: Likelihood ratio using trained density model (GMM on training data)
 - **Simple Baseline**: Direct threshold on model confidence (max softmax probability)
