@@ -480,7 +480,7 @@ Based on "Generalized Out-of-Distribution Detection: A Survey", we implemented a
 
 ### Complete Hybrid Results Comparison - All Methods
 
-**All 17 methods tested, ranked by Hybrid MAE:**
+**Post-hoc OOD methods evaluated with optimal F1 thresholds (from distribution analysis), ranked by Hybrid MAE:**
 
 | Rank | Method | Type | Routing | F1 Score | Hybrid MAE | Hybrid Median | Success (≤5°) | Δ MAE |
 |------|--------|------|---------|----------|------------|---------------|---------------|-------|
@@ -488,22 +488,41 @@ Based on "Generalized Out-of-Distribution Detection: A Survey", we implemented a
 | 🥈 2 | **Oracle 30%** 🎯 | Theoretical | 30.0% | 0.655 | **10.45°** | **3.56°** | **58.4%** | **-4.96°** |
 | 🥉 3 | **ConfidNet 30°** | Supervised | 21.4% | 0.689 | **12.12°** | 4.94° | 50.5% | **-3.29°** |
 | 4 | **ConfidNet 20°** | Supervised | 30.2% | **0.729** | **12.62°** | **3.52°** | **56.3%** | **-2.79°** |
-| 5 | **VIM** ⭐ | Post-hoc OOD | 30.0% | 0.501 | **13.00°** | 4.39° | 52.6% | **-2.41°** |
-| 6 | **SHE** ⭐ | Post-hoc OOD | 30.0% | 0.496 | **13.24°** | 4.84° | 50.8% | **-2.17°** |
-| 7 | **Temp+Mahal** | Dual-Signal | 27.7% | 0.576 | 13.46° | 4.50° | 52.0% | -1.95° |
-| 8 | **GradNorm** | Post-hoc OOD | 30.0% | 0.429 | **13.86°** | 5.74° | 47.9% | **-1.54°** |
-| 9 | **MaxProb** 📊 | Simple Baseline | 30.0% | 0.546 | **13.90°** | **4.06°** | **53.6%** | **-1.51°** |
-| 10 | **DICE (80%)** | Post-hoc OOD | 30.0% | 0.317 | 14.46° | 6.61° | 41.5% | -0.94° |
-| 11 | **KNN k=10** | Post-hoc OOD | 30.0% | 0.526 | 14.73° | 4.72° | 50.7% | -0.67° |
-| 12 | MC Dropout Entropy | Post-hoc OOD | 30.0% | 0.557 | 15.16° | 5.35° | 48.0% | -0.25° |
-| 13 | Energy OOD | Post-hoc OOD | 30.1% | 0.552 | 15.27° | 6.72° | 46.4% | -0.14° |
-| 14 | **LLR GMM-5** | Density-based | 30.0% | 0.486 | 15.34° | 5.19° | 49.0% | -0.07° |
+| 5 | **DICE 90%** ⭐ | Post-hoc OOD | 83.0% | **0.821** | **14.45°** | **2.87°** | **71.1%** | **-0.96°** |
+| 6 | **Energy T=1.0** ⭐ | Post-hoc OOD | 77.0% | **0.813** | **14.71°** | **2.62°** | **70.7%** | **-0.70°** |
+| 7 | **MC Dropout Entropy T=2.0** | Post-hoc OOD | 73.0% | **0.792** | **14.78°** | **2.62°** | 69.2% | **-0.63°** |
+| 8 | **KNN k=5** | Post-hoc OOD | 81.0% | **0.802** | **14.96°** | 2.63° | **70.8%** | **-0.45°** |
+| 9 | **KNN k=20** | Post-hoc OOD | 81.0% | **0.802** | **14.99°** | 2.63° | 70.6% | -0.42° |
+| 10 | **KNN k=10** | Post-hoc OOD | 81.0% | **0.802** | **14.99°** | 2.65° | 70.6% | -0.42° |
+| 11 | **MaxProb T=4.0** | Post-hoc OOD | 78.0% | **0.792** | **15.00°** | **2.62°** | 69.4% | -0.40° |
+| 12 | **MC Dropout Entropy** | Post-hoc OOD | 77.0% | **0.795** | **15.09°** | **2.62°** | 69.1% | -0.32° |
+| 13 | **MaxProb** 📊 | Simple Baseline | 76.0% | 0.783 | **15.10°** | 2.70° | 67.9% | -0.31° |
+| 14 | **MC Dropout Variance** | Post-hoc OOD | 90.0% | 0.786 | **15.22°** | **2.87°** | **72.6%** | -0.18° |
+| 15 | **SHE** | Post-hoc OOD | 83.0% | 0.779 | **15.24°** | 2.77° | 69.6% | -0.17° |
+| 16 | **Mahalanobis** | Post-hoc OOD | 75.0% | **0.795** | **15.38°** | **2.62°** | 69.7% | -0.03° |
 | 📍 | **CRNN-only** | Baseline | 0% | - | 15.41° | 8.16° | 38.4% | 0.0° |
-| ❌ 15 | **DICE (90%)** | Post-hoc OOD | 30.0% | 0.361 | 15.54° | 6.30° | 44.4% | +0.13° |
-| ❌ 16 | Mahalanobis (alone) | Post-hoc OOD | 30.0% | 0.411 | 17.16° | 6.65° | 43.6% | +1.75° |
-| ❌ 17 | ReAct p85 | Post-hoc OOD | 30.0% | 0.387 | 17.32° | 5.94° | 45.4% | +1.91° |
+| 📍 | **SRP-only** | Baseline | 100% | - | 15.69° | 3.00° | 69.8% | +0.28° |
+| 17 | **DICE 80%** | Post-hoc OOD | 99.0% | 0.758 | 15.64° | 3.06° | 69.4% | +0.23° |
+| 18 | **GradNorm** | Post-hoc OOD | 99.0% | 0.760 | 15.67° | 3.06° | 69.7% | +0.27° |
+| 19 | **Energy OOD** | Post-hoc OOD | 100.0% | 0.762 | 15.69° | 3.00° | 69.8% | +0.29° |
+| 20 | **VIM** | Post-hoc OOD | 99.0% | 0.760 | 15.80° | 3.00° | 69.7% | +0.40° |
+| 21 | **VIM T=0.5** | Post-hoc OOD | 99.0% | 0.760 | 15.80° | 3.00° | 69.7% | +0.40° |
+| 22 | **LLR GMM-5** | Density-based | 79.0% | 0.781 | 15.92° | 2.68° | 67.9% | +0.52° |
 
-🎯 = Theoretical upper bounds | ⭐ = Best new methods | 📊 = Simple baseline | ❌ = Worse than CRNN-only baseline
+🎯 = Theoretical upper bounds | ⭐ = Best post-hoc methods with optimal thresholds | 📊 = Simple baseline
+
+**⚠️ Critical Insight - Optimal F1 Thresholds vs. Optimal Hybrid Performance:**
+
+The optimal F1 thresholds maximize routing precision/recall for detecting failures (>5° error), **not** optimal hybrid MAE. This leads to high routing rates (73-100% vs. oracle's 25-30%) because:
+
+1. **Test set has 61.6% failures** - high recall naturally requires routing most cases
+2. **SRP characteristics** dominate when routing >75%:
+   - SRP-only: MAE 15.69°, Median 3.00°, Success 69.8%
+   - CRNN-only: MAE 15.41°, Median 8.16°, Success 38.4%
+3. **Trade-off**: High routing rates improve median and success rate but **hurt MAE** compared to selective routing
+4. **Oracle advantage**: Routes only hardest 25-30% cases → better MAE (9.95-10.45°) despite worse median
+
+**Observation**: Methods with better median than oracle (e.g., DICE 90%: 2.87° vs oracle 4.06°) are simply routing more cases to SRP, not achieving better selective routing. Energy OOD at 100% routing achieves exactly SRP-only performance.
 
 **Method Categories:**
 - **Theoretical**: Oracle baselines with perfect knowledge (impossible in practice, shows upper bounds)
@@ -516,15 +535,32 @@ Based on "Generalized Out-of-Distribution Detection: A Survey", we implemented a
 
 ### Routing Quality Analysis
 
-| Method | Precision | Recall | F1 | Routed | Routes Same Cases? |
-|--------|-----------|--------|-----|--------|-------------------|
-| MaxProb | 0.833 | 0.406 | 0.546 | 603 | - |
-| KNN k=10 | 0.803 | 0.391 | 0.526 | 603 | Partial (17-61% overlap) |
-| GradNorm | 0.655 | 0.319 | 0.429 | 603 | Partial (17-61% overlap) |
-| ReAct p85 | 0.590 | 0.288 | 0.387 | 603 | Partial (17-61% overlap) |
-| Mahalanobis | 0.627 | 0.306 | 0.411 | 603 | Partial (17-61% overlap) |
+**Using optimal F1 thresholds from distribution analysis (not arbitrary 30% routing rate):**
 
-**Overlap Finding**: Methods route different cases (only 38 samples routed by all 4), suggesting complementary failure patterns. Union covers 1,274 samples (63.4% of test set).
+| Method | Precision | Recall | F1 | Routing Rate | Routed |
+|--------|-----------|--------|-----|--------------|--------|
+| **DICE 90%** ⭐ | 0.715 | 0.964 | **0.821** | 83.0% | 1667 |
+| **Energy T=1.0** ⭐ | 0.731 | 0.914 | **0.813** | 77.0% | 1547 |
+| **KNN k=20** | 0.706 | 0.929 | 0.802 | 81.0% | 1627 |
+| **KNN k=10** | 0.706 | 0.929 | 0.802 | 81.0% | 1627 |
+| **KNN k=5** | 0.706 | 0.928 | 0.802 | 81.0% | 1627 |
+| **Mahalanobis** | 0.724 | 0.882 | 0.795 | 75.0% | 1506 |
+| **MC Dropout Entropy** | 0.715 | 0.894 | 0.795 | 77.0% | 1547 |
+| **MaxProb T=4.0** | 0.708 | 0.897 | 0.792 | 78.0% | 1567 |
+| **MC Dropout Entropy T=2.0** | 0.730 | 0.865 | 0.792 | 73.0% | 1466 |
+| **MC Dropout Variance** | 0.662 | 0.967 | 0.786 | 90.0% | 1808 |
+| **MaxProb** | 0.709 | 0.875 | 0.783 | 76.0% | 1527 |
+| **LLR GMM-5** | 0.695 | 0.892 | 0.781 | 79.0% | 1587 |
+| **SHE** | 0.678 | 0.914 | 0.779 | 83.0% | 1667 |
+| **Energy OOD** | 0.616 | 1.000 | 0.762 | 100.0% | 2009 |
+| **GradNorm** | 0.617 | 0.991 | 0.760 | 99.0% | 1988 |
+| **VIM** | 0.617 | 0.991 | 0.760 | 99.0% | 1988 |
+| **VIM T=0.5** | 0.617 | 0.991 | 0.760 | 99.0% | 1988 |
+| **DICE 80%** | 0.615 | 0.989 | 0.758 | 99.0% | 1988 |
+
+⭐ = Best F1 scores (>0.80)
+
+**Key Insight**: Temperature scaling dramatically improves Energy OOD routing quality (F1: 0.762 → 0.813 with T=1.0). DICE 90% and KNN methods achieve best balance of precision and recall.
 
 ### Key Insights from Hybrid Evaluation
 
