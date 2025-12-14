@@ -51,15 +51,11 @@ dataset_test = RealData(data_dir='/Users/danieltoberman/Documents/RealMAN_datase
 
 class MyDataModule(LightningDataModule):
 
-    def __init__(self, num_workers: int = 5, batch_size: Tuple[int, int] = (16, 16)):
+    def __init__(self, num_workers: int = 0, batch_size: Tuple[int, int] = (16, 16)):
         super().__init__()
-        # Fix for MPS: multiprocessing dataloader causes deadlock on macOS
-        # Set num_workers=0 (single-process) when using MPS
-        if torch.backends.mps.is_available():
-            self.num_workers = 0
-            print("Using MPS: Setting num_workers=0 to avoid dataloader deadlock")
-        else:
-            self.num_workers = num_workers
+        # MPS requires num_workers=0 to avoid multiprocessing deadlock
+        self.num_workers = num_workers
+        print(f"DataLoader num_workers: {self.num_workers}")
         # train: batch_size[0]; test: batch_size[1]
         self.batch_size = batch_size
         #self.sampler = MyDistributedSampler(seed=1)
@@ -151,6 +147,12 @@ class MyModel(LightningModule):
         pred_batch = self(in_batch)
         loss = self.cal_loss(pred_batch=pred_batch, gt_batch=gt_batch)
         self.log("train/loss", loss, prog_bar=True)
+
+        # Print batch progress every 10 batches
+        if batch_idx % 10 == 0:
+            epoch = self.current_epoch
+            print(f"Epoch {epoch} | Batch {batch_idx} | Loss: {loss.item():.4f}")
+
         return {"loss": loss}
 
     def validation_step(self, batch, batch_idx: int):
@@ -171,8 +173,10 @@ class MyModel(LightningModule):
         loss = self.cal_loss(pred_batch=pred_batch, gt_batch=gt_batch)
 
         self.log("valid/loss", loss, sync_dist=True)
-        # Note: Metrics disabled during training due to MPS float64 incompatibility
-        # Metrics can be computed separately after training on CPU if needed
+        get_metric = at_module.PredDOA(mic_location=gt_batch[-2])
+        metric = get_metric(pred_batch=pred_batch,gt_batch=gt_batch,idx=None,tar_type='ipd')
+        for m in metric:
+            self.log('valid/'+m, metric[m].item(), sync_dist=True)
 
     def test_step(self, batch: Tensor, batch_idx: int):
         mic_sig_batch = batch[0]

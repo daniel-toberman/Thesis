@@ -634,7 +634,7 @@ class PredDOA(nn.Module):
                     azi_candidate = np.linspace(-np.pi, np.pi, nazi)
                     pred_DOA = np.stack((ele_candidate[ele_max_idx], azi_candidate[azi_max_idx]),
                         axis=-1)  # (nb, nt, 2)
-                    pred_DOA = torch.from_numpy(pred_DOA)
+                    pred_DOA = torch.from_numpy(pred_DOA).float()  # Use float32 for MPS compatibility
 
                     pred_DOA = pred_DOA.to(self.dev)
                     pred_DOAs[:, :, :, source_idx] = pred_DOA
