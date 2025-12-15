@@ -35,7 +35,8 @@ dataset_train = RealData(data_dir='/Users/danieltoberman/Documents/RealMAN_datas
                 target_dir=['/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/train/train_static_source_location_08.csv'],
                 noise_dir='/Users/danieltoberman/Documents/RealMAN_9_channels/extracted/train/ma_noise/',  # Noise from different environments
                 use_mic_id=[0,1,2,3,4,5,6,7,8],  # 6cm array, mic 0 as reference
-                )
+                on_the_fly=True,
+                snr=[-5, 15])  # Original paper setting: -5 to 15 dB
 
 dataset_val = RealData(data_dir='/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted/',
                 target_dir=['/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/val/val_static_source_location_08.csv'],
@@ -316,7 +317,7 @@ class MyModel(LightningModule):
         return data
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.arch.parameters(), lr=0.0005)
+        optimizer = torch.optim.Adam(self.arch.parameters(), lr=0.0005)  # Original paper setting
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.975, last_epoch=-1)
         return {
             'optimizer': optimizer,
