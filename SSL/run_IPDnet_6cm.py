@@ -29,24 +29,38 @@ torch.backends.cudnn.allow_tf32 = True
 #opts = opt()
 #dirs = opts.dir()
 
+# Auto-detect environment for K8s/Docker compatibility
+def get_data_root():
+    """Detect data root based on environment (local vs K8s/Docker)."""
+    # K8s/Docker: Check for mounted volumes
+    k8s_paths = ['/data', '/mnt/data', os.environ.get('DATA_ROOT')]
+    for path in k8s_paths:
+        if path and os.path.exists(path):
+            return path
+    # Local macOS
+    return '/Users/danieltoberman/Documents'
+
+DATA_ROOT = get_data_root()
+print(f"Using data root: {DATA_ROOT}")
+
 # Modified for macOS paths and 6cm array [0,1,2,3,4,5,6,7,8]
 # Mic 0 is first (reference mic at center)
-dataset_train = RealData(data_dir='/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted/',
-                target_dir=['/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/train/train_static_source_location_08.csv'],
-                noise_dir='/Users/danieltoberman/Documents/RealMAN_9_channels/extracted/train/ma_noise/',  # Noise from different environments
+dataset_train = RealData(data_dir=f'{DATA_ROOT}/RealMAN_dataset_T60_08/extracted/',
+                target_dir=[f'{DATA_ROOT}/RealMAN_dataset_T60_08/train/train_static_source_location_08.csv'],
+                noise_dir=f'{DATA_ROOT}/RealMAN_9_channels/extracted/train/ma_noise/',  # Noise from different environments
                 use_mic_id=[0,1,2,3,4,5,6,7,8],  # 6cm array, mic 0 as reference
                 on_the_fly=True,
                 snr=[-5, 15])  # Original paper setting: -5 to 15 dB
 
-dataset_val = RealData(data_dir='/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted/',
-                target_dir=['/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/val/val_static_source_location_08.csv'],
-                noise_dir='/Users/danieltoberman/Documents/RealMAN_9_channels/extracted/val/ma_noise/',  # Noise from different environments
+dataset_val = RealData(data_dir=f'{DATA_ROOT}/RealMAN_dataset_T60_08/extracted/',
+                target_dir=[f'{DATA_ROOT}/RealMAN_dataset_T60_08/val/val_static_source_location_08.csv'],
+                noise_dir=f'{DATA_ROOT}/RealMAN_9_channels/extracted/val/ma_noise/',  # Noise from different environments
                 use_mic_id=[0,1,2,3,4,5,6,7,8],  # 6cm array, mic 0 as reference
                 on_the_fly=False)
 
-dataset_test = RealData(data_dir='/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted/',
-                target_dir=['/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/test/test_static_source_location_08.csv'],
-                noise_dir='/Users/danieltoberman/Documents/RealMAN_9_channels/extracted/test/ma_noise/',  # Noise from different environments
+dataset_test = RealData(data_dir=f'{DATA_ROOT}/RealMAN_dataset_T60_08/extracted/',
+                target_dir=[f'{DATA_ROOT}/RealMAN_dataset_T60_08/test/test_static_source_location_08.csv'],
+                noise_dir=f'{DATA_ROOT}/RealMAN_9_channels/extracted/test/ma_noise/',  # Noise from different environments
                 use_mic_id=[0,1,2,3,4,5,6,7,8],  # 6cm array, mic 0 as reference
                 on_the_fly=False)
 
@@ -95,8 +109,9 @@ class MyModel(LightningModule):
             device: str = 'mps' if torch.backends.mps.is_available() else 'cpu',  # Auto-detect device
     ):
         super().__init__()
-        # For 9 mics with ch_mode='M': 1 ref + 8 others = 8 IPD pairs × 2 (real+imag) = 16 channels
-        self.arch = SingleTinyIPDnet(input_size=16)
+        # CRITICAL: IPDnet expects raw STFT as input, NOT pre-computed IPD
+        # 9 mics -> 9 channels * 2 (real+imag) = 18 input channels
+        self.arch = SingleTinyIPDnet(input_size=18, hidden_size=128)
         if compile:
             assert Version(torch.__version__) >= Version(
                 '2.0.0'), torch.__version__
@@ -257,28 +272,23 @@ class MyModel(LightningModule):
         stft_rebatch = stft_rebatch.to(self.dev)
         nb, nc, nf, nt = stft_rebatch.shape
 
-        # Compute observed IPD from microphone signals (input to IPDnet)
-        # IPD = angle(STFT_ref_mic * conj(STFT_other_mics))
-        # Using ch_mode='M': ref mic is mic 0, compute IPD with mics 1-8
-        ref_stft = stft_rebatch[:, 0:1, :, :]  # (nb, 1, nf, nt) - reference mic
-        other_stft = stft_rebatch[:, 1:, :, :]  # (nb, nc-1, nf, nt) - other mics
+        # CRITICAL FIX: Pass raw normalized STFT (real + imaginary), NOT pre-computed IPD
+        # The paper states: "The proposed network takes as input the STFT of multichannel microphone signals"
+        # IPDnet learns to extract DP-IPD internally from raw STFT
 
-        # Compute IPD: phase difference between reference and other mics
-        ipd_complex = ref_stft * torch.conj(other_stft)  # (nb, nc-1, nf, nt)
-        ipd_real = torch.real(ipd_complex)
-        ipd_imag = torch.imag(ipd_complex)
-
-        # Normalize by magnitude
+        # Normalize by magnitude (same as original code)
         mag = torch.abs(stft_rebatch)
         mean_value = torch.mean(mag.reshape(mag.shape[0],-1), dim = 1)
-        mean_value = mean_value[:,np.newaxis,np.newaxis,np.newaxis].expand((nb, nc-1, nf, nt))
+        mean_value = mean_value[:,np.newaxis,np.newaxis,np.newaxis].expand(mag.shape)
 
-        ipd_real_norm = ipd_real / (mean_value + eps)
-        ipd_imag_norm = ipd_imag / (mean_value + eps)
+        # Extract and normalize real and imaginary parts separately
+        stft_rebatch_real = torch.real(stft_rebatch) / (mean_value + eps)
+        stft_rebatch_imag = torch.imag(stft_rebatch) / (mean_value + eps)
 
-        # Concatenate real and imaginary parts: (nb, 2*(nc-1), nf, nt)
-        ipd_input = torch.cat((ipd_real_norm, ipd_imag_norm), dim=1)
-        data += [ipd_input[:, :, self.fre_range_used, :]]  # (nb, 2*8=16, nf, nt) for 9 mics
+        # Concatenate real and imaginary parts: (nb, 2*nc, nf, nt)
+        # For 9 mics: (nb, 18, nf, nt)
+        real_image_batch = torch.cat((stft_rebatch_real, stft_rebatch_imag), dim=1)
+        data += [real_image_batch[:, :, self.fre_range_used, :]]  # (nb, 18, 256, nt) for 9 mics
         ele_data = torch.ones(targets_batch.shape) * 90
         azi_ele = torch.cat((ele_data[:,:,np.newaxis,:].to(targets_batch),targets_batch[:,:,np.newaxis,:]),dim=-2)
         DOAw_batch = azi_ele / 180 * np.pi

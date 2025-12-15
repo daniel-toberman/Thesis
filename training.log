@@ -1,0 +1,23 @@
+Seed set to 2
+GPU available: True (mps), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+DataLoader num_workers: 0
+┏━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┓
+┃   ┃ Name        ┃ Type              ┃ Params ┃ Mode  ┃
+┡━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━┩
+│ 0 │ arch        │ SingleTinyIPDnet  │  478 K │ train │
+│ 1 │ dostft      │ STFT              │      0 │ train │
+│ 2 │ addbatch    │ AddChToBatch      │      0 │ train │
+│ 3 │ removebatch │ RemoveChFromBatch │      0 │ train │
+│ 4 │ get_metric  │ PredDOA           │      0 │ train │
+└───┴─────────────┴───────────────────┴────────┴───────┘
+Trainable params: 478 K                                                  
+Non-trainable params: 0                                                  
+Total params: 478 K                                                      
+Total estimated model params size (MB): 1                                
+Modules in train mode: 26                                                
+Modules in eval mode: 0                                                  
+/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/pytorch_lightning/trainer/connectors/data_connector.py:425: The 'val_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=11` in the `DataLoader` to improve performance.
+Epoch 0 metrics: valid/loss=0.4849  valid/ACC=0.7371  valid/MAE=31.2756  
+/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/pytorch_lightning/trainer/connectors/data_connector.py:425: The 'train_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=11` in the `DataLoader` to improve performance.
