@@ -174,8 +174,10 @@ class RealData(Dataset):
                 dp_sig_path = sig_path.replace('/ma_noisy_speech/', '/dp_speech/')
             else:
                 # Fallback: replace any ma_*_speech pattern
-                import re
                 dp_sig_path = re.sub(r'/ma_\w*_?speech/', '/dp_speech/', sig_path)
+
+            # dp_speech files don't have _CH suffix - strip it if present
+            dp_sig_path = re.sub(r'_CH\d+\.', '.', dp_sig_path)
             dp_sig_path = dp_sig_path.replace('.flac', '.wav')
             dp_signal, dp_fs = sf.read(dp_sig_path, dtype="float32")
             if dp_fs != self.target_fs:
@@ -292,7 +294,17 @@ class RealData(Dataset):
             else:
                 use_mic_id_item = self.use_mic_id
 
-            dp_sig_path = sig_path.replace('/ma_noisy_speech/', '/dp_speech/')
+            # Handle both ma_speech and ma_noisy_speech paths
+            if '/ma_speech/' in sig_path:
+                dp_sig_path = sig_path.replace('/ma_speech/', '/dp_speech/')
+            elif '/ma_noisy_speech/' in sig_path:
+                dp_sig_path = sig_path.replace('/ma_noisy_speech/', '/dp_speech/')
+            else:
+                # Fallback: replace any ma_*_speech pattern
+                dp_sig_path = re.sub(r'/ma_\w*_?speech/', '/dp_speech/', sig_path)
+
+            # dp_speech files don't have _CH suffix - strip it if present
+            dp_sig_path = re.sub(r'_CH\d+\.', '.', dp_sig_path)
             dp_sig_path = dp_sig_path.replace('.flac', '.wav')
             dp_signal, dp_fs = sf.read(dp_sig_path, dtype="float32")
 

@@ -78,6 +78,9 @@ class SingleTinyIPDnet(nn.Module):
         self.is_online = is_online
         self.input_size = input_size
         self.hidden_size = hidden_size
+        # For 9 mics: input_size=18 (9×2), but output should be 16 (8 IPD pairs ×2)
+        # For 5 mics: input_size=10 (5×2), output should be 8 (4 IPD pairs ×2)
+        self.output_size = input_size - 2  # One less IPD pair than mics
         # Skip connections always use original input_size
         self.block_1 = FNblock(input_size=self.input_size, is_online=False, is_first=True, skip_size=self.input_size)
         # block_1 output channels = hidden_size + input_size (from skip)
@@ -85,8 +88,8 @@ class SingleTinyIPDnet(nn.Module):
         self.block_2 = FNblock(input_size=block_1_output_channels, is_online=False, is_first=False, skip_size=self.input_size)
         # block_2 output channels = hidden_size + input_size (from skip)
         block_2_output_channels = self.hidden_size + self.input_size
-        # CNN output channels = input_size (matches number of mic pairs × 2 for real+imag)
-        self.conv = CnnBlock(in_channels=block_2_output_channels, out_channels=self.input_size)
+        # CNN output channels = output_size (8 IPD pairs × 2 for real+imag = 16 for 9 mics)
+        self.conv = CnnBlock(in_channels=block_2_output_channels, out_channels=self.output_size)
         self.sigmoid = nn.Sigmoid()
     def forward(self,x):
         x = x.permute(0,3,2,1)
