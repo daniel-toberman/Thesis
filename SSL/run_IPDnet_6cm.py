@@ -46,19 +46,19 @@ print(f"Using data root: {DATA_ROOT}")
 dataset_train = RealData(data_dir=f'{DATA_ROOT}/RealMAN_dataset_T60_08/extracted/',
                          target_dir=[f'{DATA_ROOT}/RealMAN_dataset_T60_08/train/train_static_source_location_08.csv'],
                          noise_dir=f'{DATA_ROOT}/RealMAN_9_channels/extracted/train/ma_noise/',
-                         use_mic_id=[0, 1, 2, 3, 4, 5, 6, 7, 8],
+                         use_mic_id=[1, 3, 5, 7, 0],
                          snr=[-5, 15])  # Paper setting
 
 dataset_val = RealData(data_dir=f'{DATA_ROOT}/RealMAN_dataset_T60_08/extracted/',
                        target_dir=[f'{DATA_ROOT}/RealMAN_dataset_T60_08/val/val_static_source_location_08.csv'],
                        noise_dir=f'{DATA_ROOT}/RealMAN_9_channels/extracted/val/ma_noise/',
-                       use_mic_id=[0, 1, 2, 3, 4, 5, 6, 7, 8],
+                       use_mic_id=[1, 3, 5, 7, 0],
                        on_the_fly=False)
 
 dataset_test = RealData(data_dir=f'{DATA_ROOT}/RealMAN_dataset_T60_08/extracted/',
                         target_dir=[f'{DATA_ROOT}/RealMAN_dataset_T60_08/test/test_static_source_location_08.csv'],
                         noise_dir=f'{DATA_ROOT}/RealMAN_9_channels/extracted/test/ma_noise/',
-                        use_mic_id=[0, 1, 2, 3, 4, 5, 6, 7, 8],
+                        use_mic_id=[1, 3, 5, 7, 0],
                         on_the_fly=False)
 
 
@@ -110,7 +110,7 @@ class MyModel(LightningModule):
     ):
         super().__init__()
         # 9 mics -> input_size = 9 * 2 (real+imag) = 18
-        self.arch = SingleTinyIPDnet(input_size=18, hidden_size=128)
+        self.arch = SingleTinyIPDnet()  # Was: SingleTinyIPDnet(input_size=18, hidden_size=128)
         if compile:
             assert Version(torch.__version__) >= Version(
                 '2.0.0'), torch.__version__
