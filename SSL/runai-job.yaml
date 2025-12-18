@@ -1,0 +1,43 @@
+apiVersion: run.ai/v2alpha1
+kind: TrainingWorkload
+metadata:
+  name: ipdnet-training-6cm
+  namespace: runai-YOUR_PROJECT  # Replace with your RunAI project name
+spec:
+  image: yourusername/ipdnet-training:latest  # Replace with your DockerHub image
+
+  # GPU Configuration
+  gpu:
+    value: "1"  # Request 1 GPU
+
+  # Command to run
+  command:
+    - python3
+  args:
+    - run_IPDnet_6cm.py
+    - fit
+    - --trainer.max_epochs=150
+    - --trainer.accelerator=gpu
+    - --trainer.devices=1
+    - --data.num_workers=4
+
+  # Resource requests
+  cpu:
+    value: "4"  # 4 CPU cores
+  memory:
+    value: "16Gi"  # 16GB RAM
+
+  # Volume mounts for data
+  volumes:
+    - name: data-volume
+      persistentVolumeClaim:
+        claimName: YOUR_PVC_NAME  # Replace with your PVC name
+      subPath: RealMAN_dataset_T60_08
+      containerPath: /workspace/data
+
+  # Environment variables
+  env:
+    - name: DATA_ROOT
+      value: "/workspace/data"
+    - name: PYTHONUNBUFFERED
+      value: "1"

@@ -8,7 +8,7 @@ from SingleTinyIPDnet import SingleTinyIPDnet
 from utils.my_save_config_callback import MySaveConfigCallback as SaveConfigCallback
 from utils import tag_and_log_git_status
 from utils import MyLogger as TensorBoardLogger
-from utils import MyRichProgressBar as RichProgressBar
+# Using TQDMProgressBar instead of RichProgressBar to avoid theme validation issues
 from packaging.version import Version
 from torch.utils.data import DataLoader, Dataset
 from pytorch_lightning.cli import LightningArgumentParser, LightningCLI
@@ -30,26 +30,24 @@ torch.backends.cudnn.allow_tf32 = True
 # opts = opt()
 # dirs = opts.dir()
 
-dataset_train = RealData(data_dir='/data/home/RealisticAudio/RealMAN/',
-                         target_dir=['/data/home/RealisticAudio/RealMAN/train/train_static_source_location.csv',
-                                     '/data/home/RealisticAudio/RealMAN/train/train_moving_source_location.csv'],
-                         noise_dir='/data/home/RealisticAudio/RealMAN/train/ma_noise/',
-                         use_mic_id=[1, 3, 5, 7, 0],
+dataset_train = RealData(data_dir='/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted/',
+                         target_dir=['/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/train/train_static_source_location_08.csv'],
+                         noise_dir='/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted/train/ma_noise/',
+                         use_mic_id=[0, 1, 3, 5, 7],  # Mic 0 FIRST (reference)
                          )
 
-dataset_val = RealData(data_dir='/data/home/RealisticAudio/RealMAN/',
-                       target_dir=['/data/home/RealisticAudio/RealMAN/val/val_static_source_location.csv',
-                                   '/data/home/RealisticAudio/RealMAN/val/val_moving_source_location.csv'],
-                       noise_dir='/data/home/RealisticAudio/RealMAN/val/ma_noise/',
-                       use_mic_id=[1, 3, 5, 7, 0],
+dataset_val = RealData(data_dir='/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted/',
+                       target_dir=['/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/val/val_static_source_location_08.csv'],
+                       noise_dir='/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted/val/ma_noise/',
+                       use_mic_id=[0, 1, 3, 5, 7],  # Mic 0 FIRST (reference)
                        on_the_fly=False)
 
-dataset_test = RealData(data_dir='/data/home/RealisticAudio/RealMAN/',
-                        target_dir=['/data/home/RealisticAudio/RealMAN/test/test_static_source_location.csv',
-                                    # '/data/home/RealisticAudio/RealMAN/test/test_moving_source_location.csv'
+dataset_test = RealData(data_dir='/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/',
+                        target_dir=['/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/test/test_static_source_location_08.csv',
+                                    # '/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/test/test_moving_source_location.csv'
                                     ],
-                        noise_dir='/data/home/RealisticAudio/RealMAN/test/ma_noise/',
-                        use_mic_id=[1, 3, 5, 7, 0],
+                        noise_dir='/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/test/ma_noise/',
+                        use_mic_id=[0, 1, 3, 5, 7],  # Mic 0 FIRST (reference)
                         on_the_fly=False)
 
 
@@ -97,7 +95,7 @@ class MyModel(LightningModule):
             return_metric: bool = True,
             exp_name: str = 'exp',
             compile: bool = False,
-            device: str = 'cuda',
+            device: str = 'cpu',  # Changed from 'cuda' to 'cpu' for macOS
     ):
         super().__init__()
         self.arch = SingleTinyIPDnet()
@@ -324,9 +322,10 @@ class MyCLI(LightningCLI):
     def add_arguments_to_parser(self, parser: LightningArgumentParser) -> None:
         from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
 
+        # Changed from ddp/gpu to auto/cpu for macOS compatibility
         parser.set_defaults(
-            {"trainer.strategy": "ddp"})
-        parser.set_defaults({"trainer.accelerator": "gpu"})
+            {"trainer.strategy": "auto"})
+        parser.set_defaults({"trainer.accelerator": "cpu"})
         # parser.set_defaults({"trainer.gradient_clip_val": 5, "trainer.gradient_clip_algorithm":"norm"})
 
         parser.add_lightning_class_args(EarlyStopping, "early_stopping")
@@ -349,15 +348,14 @@ class MyCLI(LightningCLI):
         }
         parser.set_defaults(model_checkpoint_defaults)
 
-        # RichProgressBar
+        # TQDMProgressBar (simpler alternative to RichProgressBar)
+        from pytorch_lightning.callbacks import TQDMProgressBar
         parser.add_lightning_class_args(
-            RichProgressBar, nested_key='progress_bar')
+            TQDMProgressBar, nested_key='progress_bar')
         parser.set_defaults({
-            "progress_bar.console_kwargs": {
-                "force_terminal": True,
-                "no_color": True,
-                "width": 200,
-            }
+            "progress_bar.refresh_rate": 1,
+            "progress_bar.leave": False,
+            "progress_bar.process_position": 0,
         })
 
         # LearningRateMonitor

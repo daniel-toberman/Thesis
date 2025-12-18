@@ -41,24 +41,24 @@ def get_data_root():
 DATA_ROOT = get_data_root()
 print(f"Using data root: {DATA_ROOT}")
 
-# Modified for 6cm array with 9 mics: [0,1,2,3,4,5,6,7,8]
-# Mic 0 is reference (center)
+# 5-mic configuration matching original paper
+# CRITICAL: use_mic_id=[1,3,5,7,0] - Reference mic (0) is LAST!
 dataset_train = RealData(data_dir=f'{DATA_ROOT}/RealMAN_dataset_T60_08/extracted/',
                          target_dir=[f'{DATA_ROOT}/RealMAN_dataset_T60_08/train/train_static_source_location_08.csv'],
                          noise_dir=f'{DATA_ROOT}/RealMAN_9_channels/extracted/train/ma_noise/',
-                         use_mic_id=[1, 3, 5, 7, 0],
-                         snr=[-5, 15])  # Paper setting
+                         use_mic_id=[1, 3, 5, 7, 0],  # Reference mic (0) LAST - matches original!
+                         snr=[-5, 15])
 
 dataset_val = RealData(data_dir=f'{DATA_ROOT}/RealMAN_dataset_T60_08/extracted/',
                        target_dir=[f'{DATA_ROOT}/RealMAN_dataset_T60_08/val/val_static_source_location_08.csv'],
                        noise_dir=f'{DATA_ROOT}/RealMAN_9_channels/extracted/val/ma_noise/',
-                       use_mic_id=[1, 3, 5, 7, 0],
+                       use_mic_id=[1, 3, 5, 7, 0],  # Reference mic (0) LAST - matches original!
                        on_the_fly=False)
 
 dataset_test = RealData(data_dir=f'{DATA_ROOT}/RealMAN_dataset_T60_08/extracted/',
                         target_dir=[f'{DATA_ROOT}/RealMAN_dataset_T60_08/test/test_static_source_location_08.csv'],
                         noise_dir=f'{DATA_ROOT}/RealMAN_9_channels/extracted/test/ma_noise/',
-                        use_mic_id=[1, 3, 5, 7, 0],
+                        use_mic_id=[1, 3, 5, 7, 0],  # Reference mic (0) LAST - matches original!
                         on_the_fly=False)
 
 
@@ -162,6 +162,7 @@ class MyModel(LightningModule):
         gt_batch = data_batch[1:]
         pred_batch = self(in_batch)
         loss = self.cal_loss(pred_batch=pred_batch, gt_batch=gt_batch)
+
         self.log("train/loss", loss, prog_bar=True)
 
         # Print progress every 10 batches

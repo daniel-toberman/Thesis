@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Git
+.git/
+.gitignore
+
+# Training artifacts
+lightning_logs/
+*.ckpt
+*.pth
+*.pt
+results/
+checkpoints/
+
+# Logs
+*.log
+training.log
+ipdnet_training.log
+
+# macOS
+.DS_Store
+*._.DS_Store
+
+# Data (don't copy to Docker - will mount from PVC)
+*.wav
+*.flac
+*.npz
+*.pkl
+
+# Test files
+test_*.py
+*_test.py
