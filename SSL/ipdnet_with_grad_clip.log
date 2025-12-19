@@ -1,0 +1,100 @@
+Seed set to 2
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/pytorch_lightning/trainer/setup.py:177: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+
+  | Name        | Type              | Params | Mode 
+----------------------------------------------------------
+0 | arch        | SingleTinyIPDnet  | 452 K  | train
+1 | dostft      | STFT              | 0      | train
+2 | addbatch    | AddChToBatch      | 0      | train
+3 | removebatch | RemoveChFromBatch | 0      | train
+4 | get_metric  | PredDOA           | 0      | train
+----------------------------------------------------------
+452 K     Trainable params
+0         Non-trainable params
+452 K     Total params
+1.810     Total estimated model params size (MB)
+26        Modules in train mode
+0         Modules in eval mode
+Using data root: /Users/danieltoberman/Documents
+Sanity Checking: |          | 0/? [00:00<?, ?it/s]/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/pytorch_lightning/trainer/connectors/data_connector.py:425: The 'val_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=11` in the `DataLoader` to improve performance.
+Sanity Checking:   0%|          | 0/2 [00:00<?, ?it/s]Sanity Checking DataLoader 0:   0%|          | 0/2 [00:00<?, ?it/s]Traceback (most recent call last):
+  File "/Users/danieltoberman/Documents/git/Thesis/SSL/run_IPDnet_6cm.py", line 388, in <module>
+    cli_main()
+  File "/Users/danieltoberman/Documents/git/Thesis/SSL/run_IPDnet_6cm.py", line 373, in cli_main
+    cli = MyCLI(
+          ^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/pytorch_lightning/cli.py", line 412, in __init__
+    self._run_subcommand(self.subcommand)
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/pytorch_lightning/cli.py", line 727, in _run_subcommand
+    fn(**fn_kwargs)
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/pytorch_lightning/trainer/trainer.py", line 561, in fit
+    call._call_and_handle_interrupt(
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/pytorch_lightning/trainer/call.py", line 48, in _call_and_handle_interrupt
+    return trainer_fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/pytorch_lightning/trainer/trainer.py", line 599, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/pytorch_lightning/trainer/trainer.py", line 1012, in _run
+    results = self._run_stage()
+              ^^^^^^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/pytorch_lightning/trainer/trainer.py", line 1054, in _run_stage
+    self._run_sanity_check()
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/pytorch_lightning/trainer/trainer.py", line 1083, in _run_sanity_check
+    val_loop.run()
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/pytorch_lightning/loops/utilities.py", line 179, in _decorator
+    return loop_run(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/pytorch_lightning/loops/evaluation_loop.py", line 145, in run
+    self._evaluation_step(batch, batch_idx, dataloader_idx, dataloader_iter)
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/pytorch_lightning/loops/evaluation_loop.py", line 437, in _evaluation_step
+    output = call._call_strategy_hook(trainer, hook_name, *step_args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/pytorch_lightning/trainer/call.py", line 328, in _call_strategy_hook
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/pytorch_lightning/strategies/strategy.py", line 412, in validation_step
+    return self.lightning_module.validation_step(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/SSL/run_IPDnet_6cm.py", line 183, in validation_step
+    pred_batch = self(in_batch)
+                 ^^^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/SSL/run_IPDnet_6cm.py", line 141, in forward
+    return self.arch(x)
+           ^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/SSL/SingleTinyIPDnet.py", line 89, in forward
+    x = self.block_1(x,fb_skip=fb_skip,nb_skip=nb_skip)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/SSL/SingleTinyIPDnet.py", line 34, in forward
+    x, _ = self.fullLstm(x)
+           ^^^^^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/danieltoberman/Documents/git/Thesis/.venv/lib/python3.11/site-packages/torch/nn/modules/rnn.py", line 1124, in forward
+    result = _VF.lstm(
+             ^^^^^^^^^
+RuntimeError: Placeholder storage has not been allocated on MPS device!

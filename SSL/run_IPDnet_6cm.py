@@ -378,6 +378,8 @@ def cli_main():
         trainer_defaults={
             "max_epochs": 150,
             "check_val_every_n_epoch": 1,
+            "gradient_clip_val": 1.0,
+            "gradient_clip_algorithm": "norm",
         }
     )
 
