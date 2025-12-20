@@ -12,3 +12,6 @@ SSL_logs/
 xsrpMain/xsrp/__pycache__/
 
 08_CRNN/best/
+
+# Allow SRP cached results
+!hybrid_system/advanced_failure_detection/features/srp_results_mics_*.pkl

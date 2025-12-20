@@ -1,6 +1,9 @@
 # Large feature files (can be regenerated)
-features/
+features/*.npz
+features/*_features.npz
 *.npz
+# Allow SRP cached results - do NOT ignore these
+# features/srp_results_mics_*.pkl are tracked
 
 # Python cache
 __pycache__/

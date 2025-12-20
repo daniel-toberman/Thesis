@@ -2,7 +2,7 @@ _instantiator: pytorch_lightning.cli.instantiate_module
 ch_mode: M
 compile: false
 cuda_activated: true
-device: mps
+device: cpu
 exp_name: ipdnet_6cm
 fs: 16000
 max_num_sources: 1
