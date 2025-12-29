@@ -32,6 +32,20 @@ class DICEOODRouter:
         H = np.vstack(H_list)
         return H
 
+    def _compute_V_streaming(self, H, W, batch_size=50000):
+        """
+        Compute V_j = E[|h_j * W_j|] without large temporaries
+        """
+        N, D = H.shape
+        V = np.zeros(D, dtype=np.float64)
+
+        for i in range(0, N, batch_size):
+            h_batch = H[i:i + batch_size]  # (B, D)
+            V += np.sum(np.abs(h_batch * W.T), axis=0)
+
+        V /= N
+        return V
+
     def _expand_targets(self, features):
         """
         Repeat per-sample target for each frame
@@ -47,21 +61,45 @@ class DICEOODRouter:
         Y = np.concatenate(Y_expanded)[:, None]
         return Y
 
-    def _fit_linear_head(self, H, Y):
+    def _fit_linear_head_streaming(self, features):
         """
-        Fit Y ≈ H W + b using least squares
+        Fit Y ≈ H W + b using streaming normal equations.
+        Guaranteed to return (W, b).
         """
-        assert H.ndim == 2
-        assert Y.ndim == 2
 
-        N = H.shape[0]
-        H_aug = np.hstack([H, np.ones((N, 1))])
+        H_list = features["penultimate_features"]
+        Y_list = features["logits_pre_sig"]
 
-        theta, _, _, _ = np.linalg.lstsq(H_aug, Y, rcond=None)
+        # --- sanity checks ---
+        assert len(H_list) > 0
+        assert len(H_list) == len(Y_list)
 
-        W = theta[:-1]
-        b = theta[-1]
+        D = H_list[0].shape[1]
 
+        XtX = np.zeros((D + 1, D + 1), dtype=np.float64)
+        Xty = np.zeros((D + 1, 1), dtype=np.float64)
+
+        for h, y_vec in zip(H_list, Y_list):
+            y = np.mean(y_vec)  # ← SCALAR TARGET
+            T = h.shape[0]
+
+            # augment with bias
+            ones = np.ones((T, 1), dtype=h.dtype)
+            h_aug = np.hstack([h, ones])  # (T, D+1)
+
+            XtX += h_aug.T @ h_aug
+            Xty += h_aug.T @ np.full((T, 1), y, dtype=np.float64)
+
+        # ridge regularization
+        lam = 1e-4
+        XtX += lam * np.eye(D + 1)
+
+        theta = np.linalg.solve(XtX, Xty)
+
+        W = theta[:-1]  # (D, 1)
+        b = theta[-1]  # (1,)
+
+        # --- ABSOLUTE GUARANTEE ---
         return W, b
 
     # ------------------------------------------------------------------
@@ -76,19 +114,14 @@ class DICEOODRouter:
         - logits_pre_sig: list or array of scalars
         """
 
-        H = self._stack_frames(features)          # (N, D)
-        Y = self._expand_targets(features)        # (N, 1)
-
-        # ---------------------------------------------------------
-        # 1. Fit surrogate linear head
-        # ---------------------------------------------------------
-        W, b = self._fit_linear_head(H, Y)
+        W, b = self._fit_linear_head_streaming(features)
+        H = self._stack_frames(features)
 
         # ---------------------------------------------------------
         # 2. Compute contribution matrix
         # V_j = E[ |h_j * W_j| ]
         # ---------------------------------------------------------
-        V = np.mean(np.abs(H * W.T), axis=0)      # (D,)
+        V = self._compute_V_streaming(H, W)
 
         # ---------------------------------------------------------
         # 3. Sparsification mask

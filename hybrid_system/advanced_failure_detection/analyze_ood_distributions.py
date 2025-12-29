@@ -307,7 +307,7 @@ def generate_summary_report(all_method_results, output_dir='results/ood_distribu
 
     # Generate markdown report
     md_path = f'{output_dir}/ANALYSIS_REPORT.md'
-    with open(md_path, 'w') as f:
+    with open(md_path, 'w', encoding='utf-8') as f:
         f.write("# OOD Method Distribution Analysis\n\n")
         f.write("## Summary\n\n")
         f.write("This report analyzes score distributions for post-hoc OOD methods across three datasets:\n")
@@ -383,7 +383,7 @@ def main():
         'knn_k5',                    # KNN k=5
         'knn_k20',                   # KNN k=20
         'mc_dropout_variance',       # MC Dropout Variance
-        'react_p90',                 # ReAct p90
+        # 'react_p90',                 # ReAct p90
     ]
 
     # Create output directory
