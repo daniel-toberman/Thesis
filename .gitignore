@@ -15,3 +15,11 @@ xsrpMain/xsrp/__pycache__/
 
 # Allow SRP cached results
 !hybrid_system/advanced_failure_detection/features/srp_results_mics_*.pkl
+
+crnn features/
+
+.idea/
+
+*.pyc
+
+crnn features_old/

@@ -20,7 +20,7 @@ from tqdm import tqdm
 import pickle
 
 # SRP imports
-sys.path.append("/Users/danieltoberman/Documents/git/Thesis/xsrpMain")
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'xsrpMain'))
 from xsrp.conventional_srp import ConventionalSrp
 from SSL.utils_ import audiowu_high_array_geometry
 
@@ -31,12 +31,17 @@ from knn_ood_routing import KNNOODRouter
 from react_ood_routing import ReActOODRouter
 from gradnorm_ood_routing import GradNormOODRouter
 from mahalanobis_ood_routing import MahalanobisOODRouter
+from confidnet_routing import ConfidNetRouter
+from dice_ood_routing import DICEOODRouter
+from she_ood_routing import SHEOODRouter
+from vim_ood_routing import VIMOODRouter
+from max_prob_routing import MaxProbRouter
+from llr_ood_routing import LLROODRouter
+
 
 # Paths
 DATA_ROOT = Path("/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/extracted")
 CSV_PATH = Path("/Users/danieltoberman/Documents/RealMAN_dataset_T60_08/test/test_static_source_location_08.csv")
-FEATURES_PATH = Path("/Users/danieltoberman/Documents/git/Thesis/hybrid_system/advanced_failure_detection/features/test_3x12cm_consecutive_features.npz")
-CACHED_SRP_PATH = Path("features/test_3x12cm_srp_results.pkl")
 
 # Configuration
 MIC_ORDER_SRP = [0, 9, 10, 11, 4, 5, 6, 7, 8]  # SRP order
@@ -110,23 +115,39 @@ def run_srp_on_case(audio_path, mic_order_srp, gt_angle):
     return srp_pred, error
 
 
-def evaluate_ood_hybrid(method, threshold, output_dir):
+def evaluate_ood_hybrid(method, threshold, output_dir, features_path, srp_cache_path):
     """
     Evaluate OOD method with actual SRP runs.
 
     Args:
-        method: 'energy' or 'mc_dropout'
+        method: OOD method name
         threshold: OOD score threshold for routing
         output_dir: Where to save results
+        features_path: Path to the CRNN features file (.npz)
+        srp_cache_path: Path to the cached SRP results file (.pkl)
     """
     print("="*100)
     print(f"EVALUATING OOD HYBRID: {method.upper()}")
+    print(f"  Features: {features_path}")
+    print(f"  SRP Cache: {srp_cache_path}")
     print("="*100)
 
     # Load test features
-    print(f"\nLoading test features from: {FEATURES_PATH}")
-    data = np.load(FEATURES_PATH, allow_pickle=True)
-    features = {key: data[key] for key in data.files}
+    print(f"\nLoading test features from: {features_path}")
+    with open(features_path, 'rb') as f:
+        data_list = pickle.load(f)
+
+    # Convert list of dictionaries to a dictionary of numpy arrays
+    df_crnn = pd.DataFrame(data_list)
+    features = {
+        'predictions': df_crnn['crnn_pred'].to_numpy(),
+        'gt_angles': df_crnn['gt_angle'].to_numpy(),
+        'abs_errors': df_crnn['crnn_error'].to_numpy(),
+        'penultimate_features': np.stack(df_crnn['penultimate_features'].values),
+        'logits_pre_sig': np.stack(df_crnn['logits_pre_sig'].values),
+        'avg_predictions': np.stack(df_crnn['avg_prediction'].values),
+        'global_indices': df_crnn['global_idx'].to_numpy()
+    }
 
     crnn_preds = features['predictions']
     gt_angles = features['gt_angles']
@@ -140,40 +161,61 @@ def evaluate_ood_hybrid(method, threshold, output_dir):
     df = pd.read_csv(CSV_PATH)
 
     # Initialize router
+    router_args = {'features': features, 'threshold': threshold}
     if method == 'energy':
         print("\nInitializing Energy OOD router...")
         router = EnergyOODRouter(model_path='models/energy_ood_20.0deg/energy_ood_model.pkl')
-        route_to_srp, scores = router.predict_routing(features, threshold)
-        use_entropy = False
+        route_to_srp, scores = router.predict_routing(**router_args)
     elif method == 'mc_dropout':
         print("\nInitializing MC Dropout router...")
         router = MCDropoutRouter()
-        route_to_srp, scores = router.predict_routing(features, threshold, use_entropy=True)
-        use_entropy = True
+        route_to_srp, scores = router.predict_routing(**router_args, use_entropy=True)
     elif method == 'knn':
         print("\nInitializing KNN OOD router...")
-        router = KNNOODRouter(k=10)  # Use k=10 (best F1)
-        router.train(features)  # Train on test features (not ideal but works)
-        route_to_srp, scores = router.predict_routing(features, threshold)
-        use_entropy = False
+        router = KNNOODRouter(k=10)
+        router.train(features)
+        route_to_srp, scores = router.predict_routing(**router_args)
     elif method == 'react':
         print("\nInitializing ReAct router...")
-        router = ReActOODRouter(clip_percentile=85)  # Use p85 (best F1)
+        router = ReActOODRouter(clip_percentile=85)
         router.train(features)
-        route_to_srp, scores = router.predict_routing(features, threshold)
-        use_entropy = False
+        route_to_srp, scores = router.predict_routing(**router_args)
     elif method == 'gradnorm':
         print("\nInitializing GradNorm router...")
         router = GradNormOODRouter()
         router.train(features)
-        route_to_srp, scores = router.predict_routing(features, threshold)
-        use_entropy = False
+        route_to_srp, scores = router.predict_routing(**router_args)
     elif method == 'mahalanobis':
         print("\nInitializing Mahalanobis router...")
         router = MahalanobisOODRouter()
         router.train(features)
-        route_to_srp, scores = router.predict_routing(features, threshold)
-        use_entropy = False
+        route_to_srp, scores = router.predict_routing(**router_args)
+    elif method == 'confidnet':
+        print("\nInitializing ConfidNet router...")
+        router = ConfidNetRouter(model_path='models/confidnet_20deg/best_model.ckpt')
+        route_to_srp, scores = router.predict_routing(**router_args)
+    elif method == 'dice':
+        print("\nInitializing DICE router...")
+        router = DiceOODRouter(weight_path='models/dice_weights.pkl')
+        route_to_srp, scores = router.predict_routing(**router_args)
+    elif method == 'she':
+        print("\nInitializing SHE router...")
+        router = SheOODRouter()
+        router.train(features)
+        route_to_srp, scores = router.predict_routing(**router_args)
+    elif method == 'vim':
+        print("\nInitializing VIM router...")
+        router = VimOODRouter()
+        router.train(features)
+        route_to_srp, scores = router.predict_routing(**router_args)
+    elif method == 'max_prob':
+        print("\nInitializing Max Probability router...")
+        router = MaxProbRouter()
+        route_to_srp, scores = router.predict_routing(**router_args)
+    elif method == 'llr':
+        print("\nInitializing LLR router...")
+        router = LLROODRouter(gmm_path='models/gmm_5_components.pkl')
+        route_to_srp, scores = router.predict_routing(**router_args)
     else:
         raise ValueError(f"Unknown method: {method}")
 
@@ -197,13 +239,14 @@ def evaluate_ood_hybrid(method, threshold, output_dir):
 
     # Check if cached SRP results exist
     routed_indices = np.where(route_to_srp)[0]
+    srp_cache_path = Path(srp_cache_path)
 
-    if CACHED_SRP_PATH.exists():
-        print(f"\n✅ Found cached SRP results: {CACHED_SRP_PATH}")
+    if srp_cache_path.exists():
+        print(f"\n✅ Found cached SRP results: {srp_cache_path}")
         print(f"Loading pre-computed SRP predictions for {n_routed} routed cases...")
 
         # Load cached results
-        with open(CACHED_SRP_PATH, 'rb') as f:
+        with open(srp_cache_path, 'rb') as f:
             cached_df = pickle.load(f)
 
         # Filter to routed indices
@@ -229,7 +272,7 @@ def evaluate_ood_hybrid(method, threshold, output_dir):
 
     else:
         # Fall back to real-time SRP computation
-        print(f"\n⚠️  No cached SRP results found at: {CACHED_SRP_PATH}")
+        print(f"\n⚠️  No cached SRP results found at: {srp_cache_path}")
         print(f"Running SRP on {n_routed} routed cases in real-time...")
         print("This will take ~1-2 hours...")
         print("Tip: Run 'python precompute_srp_results.py' once to cache all SRP results!")
@@ -270,7 +313,8 @@ def evaluate_ood_hybrid(method, threshold, output_dir):
         srp_df = pd.DataFrame(srp_results)
 
     print(f"\nSRP completed: {len(srp_df)} / {n_routed} successful")
-    print(f"SRP MAE on routed: {srp_df['srp_error'].mean():.2f}°")
+    if not srp_df.empty:
+        print(f"SRP MAE on routed: {srp_df['srp_error'].mean():.2f}°")
 
     # Compute hybrid performance
     print("\n" + "="*100)
@@ -281,9 +325,10 @@ def evaluate_ood_hybrid(method, threshold, output_dir):
     hybrid_errors = abs_errors.copy()
 
     # Replace routed samples with SRP predictions
-    for _, row in srp_df.iterrows():
-        idx = int(row['sample_idx'])
-        hybrid_errors[idx] = row['srp_error']
+    if not srp_df.empty:
+        for _, row in srp_df.iterrows():
+            idx = int(row['sample_idx'])
+            hybrid_errors[idx] = row['srp_error']
 
     # Compute metrics
     hybrid_mae = hybrid_errors.mean()
@@ -350,16 +395,28 @@ def evaluate_ood_hybrid(method, threshold, output_dir):
 def main():
     parser = argparse.ArgumentParser(description='Evaluate OOD hybrid with actual SRP')
     parser.add_argument('--method', type=str, required=True,
-                        choices=['energy', 'mc_dropout', 'knn', 'react', 'gradnorm', 'mahalanobis'],
+                        choices=['energy', 'mc_dropout', 'knn', 'react', 'gradnorm', 'mahalanobis', 'confidnet', 'dice', 'she', 'vim', 'max_prob', 'llr'],
                         help='OOD method to evaluate')
     parser.add_argument('--threshold', type=float, required=True,
                         help='OOD score threshold for routing')
     parser.add_argument('--output_dir', type=str, required=True,
                         help='Output directory for results')
+    parser.add_argument('--features_path', type=str,
+                        default="/Users/danieltoberman/Documents/git/Thesis/hybrid_system/advanced_failure_detection/features/test_3x12cm_consecutive_features.npz",
+                        help='Path to the CRNN features file (.npz)')
+    parser.add_argument('--srp_cache_path', type=str,
+                        default="features/test_3x12cm_srp_results.pkl",
+                        help='Path to the cached SRP results file (.pkl)')
 
     args = parser.parse_args()
 
-    evaluate_ood_hybrid(args.method, args.threshold, args.output_dir)
+    evaluate_ood_hybrid(
+        method=args.method,
+        threshold=args.threshold,
+        output_dir=args.output_dir,
+        features_path=args.features_path,
+        srp_cache_path=args.srp_cache_path
+    )
 
 
 if __name__ == "__main__":

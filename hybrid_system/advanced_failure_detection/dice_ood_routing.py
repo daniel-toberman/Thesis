@@ -1,138 +1,129 @@
 """
 DICE OOD Detection
-Faithful NumPy implementation based on:
-"DICE: Leveraging Sparsification for Out-of-Distribution Detection"
-Sun & Li, NeurIPS 2022
+Adapted for pipelines without explicit W and b
+Regression-safe, variable-length-safe
 """
 
 import numpy as np
 
 
 def logsumexp(x, axis=-1):
-    """Numerically stable log-sum-exp."""
     x_max = np.max(x, axis=axis, keepdims=True)
     return np.squeeze(x_max + np.log(np.sum(np.exp(x - x_max), axis=axis, keepdims=True)))
 
 
 class DICEOODRouter:
-    """
-    DICE (Density-aware / Directed Sparsification) OOD router.
-
-    This class:
-    1. Computes contribution matrix V = E[W ⊙ h(x)] on ID data
-    2. Keeps top-(1-p) percentile of contributions
-    3. Applies sparsified weights at inference
-    4. Uses energy score for OOD detection
-    """
-
     def __init__(self, clip_percentile=80):
-        """
-        clip_percentile: percentile of contributions to KEEP
-        (e.g. 80 -> keep top 20%, sparsity p=0.8)
-        """
         self.clip_percentile = clip_percentile
+        self.W_sparse = None
+        self.b = None
+        self.is_regression = True  # your case
 
-        self.mask = None          # M ∈ {0,1}^{m×C}
-        self.W_sparse = None      # sparsified weights
-        self.b = None             # bias
+        print(f"Initialized DICE OOD Router (percentile={clip_percentile})")
 
-        print(f"Initialized DICE OOD Router with clip_percentile={clip_percentile}")
+    # ------------------------------------------------------------------
+    # Utilities
+    # ------------------------------------------------------------------
+    def _stack_frames(self, features):
+        """
+        Convert list-of-(T_i, D) into (N, D)
+        """
+        H_list = features["penultimate_features"]
+        H = np.vstack(H_list)
+        return H
 
+    def _expand_targets(self, features):
+        """
+        Repeat per-sample target for each frame
+        """
+        Y_list = features["logits_pre_sig"]
+        H_list = features["penultimate_features"]
+
+        Y_expanded = []
+        for y, h in zip(Y_list, H_list):
+            T = h.shape[0]
+            Y_expanded.append(np.repeat(y, T))
+
+        Y = np.concatenate(Y_expanded)[:, None]
+        return Y
+
+    def _fit_linear_head(self, H, Y):
+        """
+        Fit Y ≈ H W + b using least squares
+        """
+        assert H.ndim == 2
+        assert Y.ndim == 2
+
+        N = H.shape[0]
+        H_aug = np.hstack([H, np.ones((N, 1))])
+
+        theta, _, _, _ = np.linalg.lstsq(H_aug, Y, rcond=None)
+
+        W = theta[:-1]
+        b = theta[-1]
+
+        return W, b
+
+    # ------------------------------------------------------------------
+    # Training
+    # ------------------------------------------------------------------
     def train(self, features):
         """
-        Train DICE mask using in-distribution data.
+        Train DICE mask using ID data only.
 
-        Required entries in `features`:
-        - features["penultimate"]: shape (N, m)
-        - features["W"]: shape (m, C)
-        - features["b"]: shape (C,)
+        Required keys:
+        - penultimate_features: list of (T_i, D)
+        - logits_pre_sig: list or array of scalars
         """
 
-        H = features["penultimate"]   # (N, m)
-        W = features["W"]             # (m, C)
-        b = features["b"]             # (C,)
-
-        if H.ndim != 2:
-            raise ValueError("penultimate features must be 2D (N, m)")
-        if W.ndim != 2:
-            raise ValueError("W must be 2D (m, C)")
-        if b.ndim != 1:
-            raise ValueError("b must be 1D (C,)")
-
-        N, m = H.shape
-        m_w, C = W.shape
-
-        if m != m_w:
-            raise ValueError("Mismatch between feature dim and weight dim")
+        H = self._stack_frames(features)          # (N, D)
+        Y = self._expand_targets(features)        # (N, 1)
 
         # ---------------------------------------------------------
-        # 1. Compute contribution matrix V = E[W ⊙ h(x)]
+        # 1. Fit surrogate linear head
         # ---------------------------------------------------------
-        # Expand H to (N, m, 1) and W to (1, m, C)
-        # Result: (N, m, C)
-        contributions = H[:, :, None] * W[None, :, :]
-        V = contributions.mean(axis=0)   # (m, C)
+        W, b = self._fit_linear_head(H, Y)
 
         # ---------------------------------------------------------
-        # 2. Build sparsification mask
+        # 2. Compute contribution matrix
+        # V_j = E[ |h_j * W_j| ]
         # ---------------------------------------------------------
-        flat_V = V.flatten()
-        threshold = np.percentile(flat_V, self.clip_percentile)
+        V = np.mean(np.abs(H * W.T), axis=0)      # (D,)
 
+        # ---------------------------------------------------------
+        # 3. Sparsification mask
+        # ---------------------------------------------------------
+        threshold = np.percentile(V, self.clip_percentile)
         M = (V > threshold).astype(np.float32)
 
-        # ---------------------------------------------------------
-        # 3. Store sparsified weights
-        # ---------------------------------------------------------
-        self.mask = M
-        self.W_sparse = W * M
+        self.W_sparse = W * M[:, None]
         self.b = b
 
-        kept_ratio = M.mean()
-        print(
-            f"DICE training complete | "
-            f"Kept weights: {kept_ratio * 100:.2f}%"
-        )
+        kept = 100.0 * M.mean()
+        print(f"DICE trained | kept weights: {kept:.2f}%")
 
+    # ------------------------------------------------------------------
+    # Inference
+    # ------------------------------------------------------------------
     def compute_dice_scores(self, features):
         """
-        Compute DICE energy scores.
-
-        Required entries in `features`:
-        - features["penultimate"]: shape (N, m)
-
-        Returns:
-        - energy scores (higher = more ID-like)
+        Compute frame-level DICE scores
         """
-
         if self.W_sparse is None:
-            raise RuntimeError("DICE router must be trained before inference")
+            raise RuntimeError("DICE router not trained")
 
-        H = features["penultimate"]   # (N, m)
+        H = self._stack_frames(features)           # (N, D)
+        logits = H @ self.W_sparse + self.b        # (N, 1)
 
-        # ---------------------------------------------------------
-        # 4. Compute sparsified logits
-        # f_DICE(x) = (M ⊙ W)^T h(x) + b
-        # ---------------------------------------------------------
-        logits = H @ self.W_sparse + self.b  # (N, C)
-
-        # ---------------------------------------------------------
-        # 5. Energy score
-        # S(x) = logsumexp(logits)
-        # ---------------------------------------------------------
-        scores = logsumexp(logits, axis=1)
+        # Regression energy
+        scores = np.abs(logits.squeeze())
 
         return scores
 
     def predict_routing(self, features, threshold):
         """
-        Predict routing based on DICE OOD score.
-
-        Returns:
-        - route_to_srp: boolean mask (True = OOD)
-        - ood_scores: energy scores
+        Lower score => more OOD
         """
-
-        ood_scores = self.compute_dice_scores(features)
-        route_to_srp = ood_scores < threshold  # lower energy => OOD
-        return route_to_srp, ood_scores
+        scores = self.compute_dice_scores(features)
+        route_to_srp = scores < threshold
+        return route_to_srp, scores

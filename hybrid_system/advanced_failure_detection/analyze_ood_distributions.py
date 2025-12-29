@@ -38,7 +38,7 @@ def load_data_splits():
     print("\nLoading data splits...")
 
     # Load validation (6cm only)
-    val_path = 'features/train_6cm_features.npz'
+    val_path = 'features/train_combined_features.npz'
     val_data = np.load(val_path, allow_pickle=True)
     val_features = {key: val_data[key] for key in val_data.files}
     print(f"  Loaded validation: {len(val_features['abs_errors'])} samples")
@@ -119,13 +119,13 @@ def compute_method_scores(method_name, features, val_features=None):
             router.train(val_features)
         scores = router.compute_gradnorm_scores(features)
 
-    # ReAct
-    elif method_name.startswith('react_p'):
-        percentile = int(method_name.split('_p')[1])
-        router = ReActOODRouter(clip_percentile=percentile)
-        if val_features is not None:
-            router.train(val_features)
-        scores = router.compute_react_scores(features['features'], features['logits_pre_sig'])
+    # # ReAct
+    # elif method_name.startswith('react_p'):
+    #     percentile = int(method_name.split('_p')[1])
+    #     router = ReActOODRouter(clip_percentile=percentile)
+    #     if val_features is not None:
+    #         router.train(val_features)
+    #     scores = router.compute_react_scores(features['features'], features['logits_pre_sig'])
 
     # VIM
     elif method_name == 'vim':
@@ -144,23 +144,23 @@ def compute_method_scores(method_name, features, val_features=None):
     # DICE
     elif method_name.startswith('dice_'):
         sparsity = int(method_name.split('_')[1])
-        router = DICEOODRouter(sparsity_percentile=sparsity)
+        router = DICEOODRouter(clip_percentile=sparsity)
         if val_features is not None:
             router.train(val_features)
         scores = router.compute_dice_scores(features)
 
-    # LLR
-    elif method_name.startswith('llr_gmm'):
-        n_components = int(method_name.split('gmm')[1])
-        router = LLROODRouter(n_components=n_components)
-        if val_features is not None:
-            # LLR needs combined training features (not just 6cm)
-            # Load the combined training features
-            train_combined_path = 'features/train_combined_features.npz'
-            train_combined_data = np.load(train_combined_path, allow_pickle=True)
-            train_combined = {key: train_combined_data[key] for key in train_combined_data.files}
-            router.train(train_combined)
-        scores = router.compute_llr_scores(features)
+    # # LLR
+    # elif method_name.startswith('llr_gmm'):
+    #     n_components = int(method_name.split('gmm')[1])
+    #     router = LLROODRouter(n_components=n_components)
+    #     if val_features is not None:
+    #         # LLR needs combined training features (not just 6cm)
+    #         # Load the combined training features
+    #         train_combined_path = 'features/train_combined_features.npz'
+    #         train_combined_data = np.load(train_combined_path, allow_pickle=True)
+    #         train_combined = {key: train_combined_data[key] for key in train_combined_data.files}
+    #         router.train(train_combined)
+    #     scores = router.compute_llr_scores(features)
 
     # Max Probability
     elif method_name == 'max_prob':
@@ -374,10 +374,10 @@ def main():
         'energy',                    # Energy OOD (15.27° MAE)
 
         # Poor performing methods
-        'llr_gmm5',                  # Likelihood ratio (15.34° MAE - shows why density fails)
+        # 'llr_gmm5',                  # Likelihood ratio (15.34° MAE - shows why density fails)
         'dice_90',                   # DICE 90% sparsity (15.54° MAE - worse than baseline)
         'mahalanobis',               # Mahalanobis distance (17.16° MAE)
-        'react_p85',                 # ReAct p85 (17.32° MAE)
+        # 'react_p85',                 # ReAct p85 (17.32° MAE)
 
         # Additional variants for completeness
         'knn_k5',                    # KNN k=5
