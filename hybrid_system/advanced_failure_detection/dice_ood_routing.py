@@ -140,16 +140,23 @@ class DICEOODRouter:
     # ------------------------------------------------------------------
     def compute_dice_scores(self, features):
         """
-        Compute frame-level DICE scores
+        Compute SAMPLE-level DICE scores (one score per sample)
         """
         if self.W_sparse is None:
             raise RuntimeError("DICE router not trained")
 
-        H = self._stack_frames(features)           # (N, D)
-        logits = H @ self.W_sparse + self.b        # (N, 1)
+        sample_scores = []
 
-        # Regression energy
-        scores = np.abs(logits.squeeze())
+        for h in features["penultimate_features"]:
+            # h: (T, D)
+            logits = h @ self.W_sparse + self.b  # (T, 1)
+            frame_scores = np.abs(logits.squeeze())  # (T,)
+            sample_scores.append(frame_scores.mean())
+
+        scores = np.asarray(sample_scores)
+
+        # Safety check
+        assert scores.shape[0] == len(features["penultimate_features"])
 
         return scores
 

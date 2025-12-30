@@ -225,7 +225,7 @@ def main():
         'max_prob', 'max_prob_T4.00', 'knn_k5', 'knn_k10', 'knn_k20',
         'mc_dropout_entropy', 'mc_dropout_entropy_T2.00', 
         'mc_dropout_variance', 'mc_dropout_variance_T3.00',
-        'dice_80', 'dice_90', 'mahalanobis', 'llr_gmm5'
+        'dice_80', 'dice_90', 'mahalanobis'
     ]
 
     srp_mic_config_files = glob.glob('features/srp_results_mics_*.pkl')
@@ -236,7 +236,7 @@ def main():
         mic_config_name = mic_config_name_full.replace('srp_results_mics_', '')
         print(f"\nProcessing mic config: {mic_config_name}")
 
-        crnn_path = f"../../crnn features/crnn_results_mics_{mic_config_name}.pkl"
+        crnn_path = f"../../crnn features_old/crnn_results_mics_{mic_config_name}.pkl"
         
         test_features = load_crnn_features(crnn_path)
         srp_results = load_cached_srp_results(srp_path)
