@@ -121,7 +121,6 @@ def get_router_and_scores(method_name, features, val_features, srp_results):
         'dice_80': lambda r, f: r.compute_dice_scores(f),
         'dice_90': lambda r, f: r.compute_dice_scores(f),
         'dice_50': lambda r, f: r.compute_dice_scores(f),
-        'llr_gmm5': lambda r, f: r.compute_llr_scores(f),
         'max_prob': lambda r, f: f['max_prob'],
     }
 
@@ -248,6 +247,9 @@ def main():
         'mc_dropout_variance', 'mc_dropout_variance_T3.00',
         'dice_80', 'dice_90', 'mahalanobis', 'dice_50'
     ]
+    # methods_to_evaluate = [
+    #     'max_prob'
+    # ]
 
     srp_mic_config_files = glob.glob('srp_features_end_result/srp_results_mics_*.pkl')
     all_results = []
