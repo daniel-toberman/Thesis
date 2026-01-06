@@ -39,6 +39,7 @@ from dice_ood_routing import DICEOODRouter
 from llr_ood_routing import LLROODRouter
 from max_prob_routing import MaxProbRouter
 from oracle_ood_routing import BestOracleRouter
+from confidnet_routing import ConfidNetRouter
 
 def load_cached_srp_results(srp_path):
     """Load cached SRP predictions from a pickle file."""
@@ -92,13 +93,14 @@ def get_router_and_scores(method_name, features, val_features, srp_results):
         'knn_k5': lambda: KNNOODRouter(k=5), 'knn_k10': lambda: KNNOODRouter(k=10), 'knn_k20': lambda: KNNOODRouter(k=20),
         'mahalanobis': MahalanobisOODRouter, 'gradnorm': GradNormOODRouter, 'vim': VIMOODRouter, 'she': SHEOODRouter,
         'dice_80': lambda: DICEOODRouter(clip_percentile=80), 'dice_90': lambda: DICEOODRouter(clip_percentile=90),
-        'dice_50': lambda: DICEOODRouter(clip_percentile=50), 'max_prob': MaxProbRouter,
+        'llr_gmm5': lambda: LLROODRouter(n_components=5), 'max_prob': MaxProbRouter,
+        'confidnet': ConfidNetRouter,
     }
-
+    
     base_method = method_name.split('_T')[0]
     if base_method not in router_classes:
         raise ValueError(f"Unknown base method: {base_method}")
-
+        
     router = router_classes[base_method]()
 
     if hasattr(router, 'train'):
@@ -120,8 +122,9 @@ def get_router_and_scores(method_name, features, val_features, srp_results):
         'she': lambda r, f: r.compute_she_scores(f),
         'dice_80': lambda r, f: r.compute_dice_scores(f),
         'dice_90': lambda r, f: r.compute_dice_scores(f),
-        'dice_50': lambda r, f: r.compute_dice_scores(f),
+        'llr_gmm5': lambda r, f: r.compute_llr_scores(f),
         'max_prob': lambda r, f: f['max_prob'],
+        'confidnet': lambda r, f: r.compute_scores(f),
     }
 
     if base_method not in score_computation_methods:
@@ -234,23 +237,26 @@ def main():
     print("STARTING THRESHOLD SENSITIVITY ANALYSIS")
     print("="*80)
 
-    output_dir = 'results/threshold_sensitivity'
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    script_dir = Path(__file__).parent
+    output_dir = script_dir / 'results' / 'threshold_sensitivity'
+    output_dir.mkdir(parents=True, exist_ok=True)
     
-    val_features_path = "../../crnn features/test_6cm_features.npz"
+    val_features_path = script_dir.parent.parent / "crnn features" / "test_6cm_features.npz"
     val_features = load_crnn_features(val_features_path)
+    if val_features is None:
+        print("Could not load validation features. Exiting.")
+        return
 
     methods_to_evaluate = [
-        'best_oracle', 'energy', 'energy_T1.00', 'vim', 'vim_T0.50', 'she', 'gradnorm',
+        'best_oracle', 'energy', 'energy_T1.00', 'vim', 'vim_T0.50', 'she', 'gradnorm', 
         'max_prob', 'max_prob_T4.00', 'knn_k5', 'knn_k10', 'knn_k20',
         'mc_dropout_entropy', 'mc_dropout_entropy_T2.00', 
         'mc_dropout_variance', 'mc_dropout_variance_T3.00',
-        'dice_80', 'dice_90', 'mahalanobis', 'dice_50'
+        'dice_80', 'dice_90', 'mahalanobis', 'confidnet'
     ]
-    # methods_to_evaluate = [
-    #     'max_prob'
-    # ]
-
+    methods_to_evaluate = [
+        'confidnet'
+    ]
     srp_mic_config_files = glob.glob('srp_features_end_result/srp_results_mics_*.pkl')
     all_results = []
     
@@ -283,16 +289,24 @@ def main():
                 else:
                     fail_mask = test_features['abs_errors'] > 5.0
                     avg_scores = scores
-                    if isinstance(scores, list) or (isinstance(scores, np.ndarray) and scores.dtype == 'object'):
+                    if isinstance(scores, list) or scores.dtype == 'object':
                         avg_scores = np.array([s.mean() for s in scores if s is not None and s.size > 0])
                     
-                    relevant_scores = avg_scores[fail_mask]
-                    ascending = np.mean(relevant_scores) > np.mean(avg_scores) if relevant_scores.size > 0 else True
+                    relevant_scores = avg_scores[fail_mask] if avg_scores.ndim > 0 else np.array([])
+                    
+                    if relevant_scores.size > 0:
+                        ascending = np.mean(relevant_scores) > np.mean(avg_scores)
+                    else:
+                        ascending = True
 
                 flat_scores = scores
-                if isinstance(scores, list) or (isinstance(scores, np.ndarray) and scores.dtype == 'object'):
+                if isinstance(scores, list) or scores.dtype == 'object':
                     flat_scores = np.concatenate([s.flatten() for s in scores if s is not None])
 
+                if flat_scores.size == 0:
+                    print(f"  ⚠️ Skipping method '{method}' for config '{mic_config_name}' due to empty scores.")
+                    continue
+                
                 thresholds = np.percentile(flat_scores, np.linspace(1, 99, 50))
                 
                 for threshold in thresholds:
@@ -312,7 +326,7 @@ def main():
                 print(f"  ❌ Failed to process method '{method}' for config '{mic_config_name}': {e}")
 
     results_df = pd.DataFrame(all_results)
-    csv_path = Path(output_dir) / 'threshold_sensitivity_results.csv'
+    csv_path = output_dir / 'threshold_sensitivity_results.csv'
     results_df.to_csv(csv_path, index=False)
     print(f"\n✅ Full results saved to: {csv_path}")
 
