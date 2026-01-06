@@ -241,7 +241,9 @@ def main():
     output_dir = script_dir / 'results' / 'threshold_sensitivity'
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    val_features_path = script_dir.parent.parent / "crnn features" / "test_6cm_features.npz"
+    val_features_path = Path(
+        r'C:\daniel\Thesis\hybrid_system\advanced_failure_detection\srp_features_end_result\train_combined_features.npz')
+
     val_features = load_crnn_features(val_features_path)
     if val_features is None:
         print("Could not load validation features. Exiting.")
@@ -254,9 +256,9 @@ def main():
         'mc_dropout_variance', 'mc_dropout_variance_T3.00',
         'dice_80', 'dice_90', 'mahalanobis', 'confidnet'
     ]
-    methods_to_evaluate = [
-        'confidnet'
-    ]
+    # methods_to_evaluate = [
+    #     'confidnet'
+    # ]
     srp_mic_config_files = glob.glob('srp_features_end_result/srp_results_mics_*.pkl')
     all_results = []
     

@@ -9,7 +9,7 @@ import os
 import torch
 import numpy as np
 import pickle
-from pathlib import Path
+from pathlib import Path # Import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import pearsonr
@@ -37,7 +37,7 @@ METHODS_TO_ANALYZE = {
 }
 SCRIPT_DIR = Path(__file__).parent
 FEATURES_DIR = SCRIPT_DIR.parent.parent / 'crnn features'
-VAL_FEATURES_PATH = FEATURES_DIR / "test_6cm_features.npz"
+VAL_FEATURES_PATH = Path(r'C:\daniel\Thesis\hybrid_system\advanced_failure_detection\srp_features_end_result\train_combined_features.npz')
 RESULTS_DIR = SCRIPT_DIR / 'results' / 'ood_analysis'
 
 def load_features_from_config(config_name):
