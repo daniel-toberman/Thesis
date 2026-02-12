@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
 import glob
+from scipy.stats import entropy
 
 # Import all router classes from the parent directory
 from energy_ood_routing import EnergyOODRouter
@@ -76,17 +77,79 @@ def load_crnn_features(crnn_path):
     print(f"  Loaded CRNN features from {Path(crnn_path).name}: {len(features['abs_errors'])} samples")
     return features
 
+def load_srp_raw_features(raw_srp_path):
+    """Load raw SRP features (including srp_map) from a pickle file."""
+    if not os.path.exists(raw_srp_path):
+        print(f"  ⚠️ Raw SRP features file not found: {raw_srp_path}")
+        return None
+    with open(raw_srp_path, 'rb') as f:
+        raw_features_list = pickle.load(f)
+    print(f"  Loaded raw SRP features from {Path(raw_srp_path).name}: {len(raw_features_list)} samples")
+    return raw_features_list
+
+def calculate_srp_confidence_metrics(srp_map):
+    """Calculates entropy and max_prob from a single SRP map."""
+    if srp_map is None or len(srp_map) == 0:
+        return np.nan, np.nan
+        
+    total_power = np.sum(srp_map)
+    if total_power == 0:
+        normalized_map = np.ones_like(srp_map) / len(srp_map)
+    else:
+        normalized_map = srp_map / total_power
+    
+    srp_entropy = entropy(normalized_map + 1e-10)
+    srp_max_prob = np.max(normalized_map)
+    
+    return srp_entropy, srp_max_prob
+
+
 def count_changed_mics(mic_config_str):
     """Count the number of mics with a label >= 9."""
     mics = mic_config_str.split('_')
     return sum(1 for m_str in mics if m_str.isdigit() and int(m_str) >= 9)
 
-def get_router_and_scores(method_name, features, val_features, srp_results):
+def get_router_and_scores(method_name, features, val_features, srp_results, srp_scores=None):
     """Initializes router and computes scores for a given method."""
     if method_name == 'best_oracle':
         router = BestOracleRouter()
         scores = router.compute_improvement_scores(features, srp_results)
         return scores
+
+    if method_name in ['srp_entropy', 'srp_max_prob']:
+        if srp_scores is None:
+            raise ValueError("srp_scores must be provided for srp_entropy and srp_max_prob methods")
+        return srp_scores[method_name].values
+
+    if method_name.startswith('combo_'):
+        parts = method_name.split('_')
+        op = None
+        op_index = -1
+
+        if 'div' in parts:
+            op = 'div'
+            op_index = parts.index('div')
+        elif 'mul' in parts:
+            op = 'mul'
+            op_index = parts.index('mul')
+        
+        if op is None:
+            raise ValueError(f"Unknown combo operation in {method_name}")
+
+        crnn_method_name = '_'.join(parts[1:op_index])
+        srp_method_name = '_'.join(parts[op_index+1:])
+
+        # Get the scores for the CRNN part by calling this function recursively
+        crnn_scores = get_router_and_scores(crnn_method_name, features, val_features, srp_results, srp_scores)
+        
+        # Get the scores for the SRP part from the pre-calculated dataframe
+        srp_scores_vec = srp_scores[srp_method_name].values
+
+        if op == 'div':
+            return crnn_scores / (srp_scores_vec + 1e-9)
+        if op == 'mul':
+            return crnn_scores * srp_scores_vec
+
 
     router_classes = {
         'energy': EnergyOODRouter, 'mc_dropout_entropy': MCDropoutRouter, 'mc_dropout_variance': MCDropoutRouter,
@@ -241,21 +304,31 @@ def main():
     output_dir = script_dir / 'results' / 'threshold_sensitivity'
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    val_features_path = Path(
-        r'C:\daniel\Thesis\hybrid_system\advanced_failure_detection\srp_features_end_result\train_combined_features.npz')
-
+    val_features_path = script_dir.parent.parent / "crnn features" / "test_6cm_features.npz"
     val_features = load_crnn_features(val_features_path)
     if val_features is None:
         print("Could not load validation features. Exiting.")
         return
 
-    methods_to_evaluate = [
-        'best_oracle', 'energy', 'energy_T1.00', 'vim', 'vim_T0.50', 'she', 'gradnorm', 
-        'max_prob', 'max_prob_T4.00', 'knn_k5', 'knn_k10', 'knn_k20',
-        'mc_dropout_entropy', 'mc_dropout_entropy_T2.00', 
-        'mc_dropout_variance', 'mc_dropout_variance_T3.00',
-        'dice_80', 'dice_90', 'mahalanobis', 'confidnet'
+    base_crnn_methods = [
+        'energy', 'vim', 'she', 'gradnorm', 'max_prob', 'knn_k5', 'knn_k10', 
+        'knn_k20', 'mc_dropout_entropy', 'mc_dropout_variance', 'dice_80', 
+        'dice_90', 'mahalanobis', 'confidnet'
     ]
+    
+    methods_to_evaluate = [
+        'best_oracle', 'srp_entropy', 'srp_max_prob'
+    ] + base_crnn_methods
+    
+    # Add temperature-scaled variants that are defined
+    methods_to_evaluate.extend(['energy_T1.00', 'vim_T0.50', 'max_prob_T4.00', 
+                                'mc_dropout_entropy_T2.00', 'mc_dropout_variance_T3.00'])
+
+    # Dynamically create combination methods
+    for crnn_method in base_crnn_methods:
+        methods_to_evaluate.append(f'combo_{crnn_method}_div_srp_entropy')
+        methods_to_evaluate.append(f'combo_{crnn_method}_mul_srp_max_prob')
+
     # methods_to_evaluate = [
     #     'confidnet'
     # ]
@@ -271,6 +344,17 @@ def main():
         
         test_features = load_crnn_features(crnn_path)
         srp_results = load_cached_srp_results(srp_path)
+
+        raw_srp_path = Path('srp_features_raw') / Path(srp_path).name
+        raw_srp_features = load_srp_raw_features(raw_srp_path)
+        
+        srp_confidence_scores = []
+        if raw_srp_features:
+            for i in range(len(raw_srp_features)):
+                srp_map = raw_srp_features[i]['srp_map']
+                entropy_val, max_prob_val = calculate_srp_confidence_metrics(srp_map)
+                srp_confidence_scores.append({'srp_entropy': entropy_val, 'srp_max_prob': max_prob_val})
+        srp_scores_df = pd.DataFrame(srp_confidence_scores)
         
         if test_features is None: continue
 
@@ -284,7 +368,7 @@ def main():
                 all_results.append({'method': method, 'mic_config': mic_config_name, 'num_changed_mics': num_changed_mics, 'threshold': np.inf, 'routing_rate': 0.0, 'hybrid_mae': crnn_mae, 'hybrid_success': crnn_success})
                 all_results.append({'method': method, 'mic_config': mic_config_name, 'num_changed_mics': num_changed_mics, 'threshold': -np.inf, 'routing_rate': 100.0, 'hybrid_mae': srp_mae, 'hybrid_success': srp_success})
 
-                scores = get_router_and_scores(method, test_features, val_features, srp_results)
+                scores = get_router_and_scores(method, test_features, val_features, srp_results, srp_scores_df)
                 
                 if method == 'best_oracle':
                     ascending = True
