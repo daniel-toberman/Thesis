@@ -9,7 +9,7 @@ from lightning.pytorch.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADER
 from lightning.pytorch.loggers import CometLogger
 from torch.utils.data import DataLoader
 from torch.functional import F
-from dataloader.dataset_cls import TSSLDataSet
+from evidential_realman_adapter import EvidentialRealmanDataModule as DataModule
 
 from model.module import PredDOA
 from model.tcrnn import CRNN

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy.io import wavfile
 from scipy import signal
-from utils_ import search_files, audiowu_high_array_geometry
+from .utils_ import search_files, audiowu_high_array_geometry
 from pathlib import Path
 import re  # add if not already imported
 

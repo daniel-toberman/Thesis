@@ -1,0 +1,43 @@
+# PyTorch Lightning CLI configuration for training TCRNN on the RealMAN dataset
+# To run: python TCRNN/main_crnn.py fit --config TCRNN/config/realman_config.yaml
+
+seed_everything: 1744
+
+trainer:
+  accelerator: auto
+  strategy: ddp
+  devices: -1 # Use all available GPUs
+  max_epochs: 200
+  logger:
+    class_path: pytorch_lightning.loggers.TensorBoardLogger
+    init_args:
+      save_dir: ../lightning_logs/
+      name: evidential_crnn_realman
+  callbacks:
+    - class_path: pytorch_lightning.callbacks.ModelCheckpoint
+      init_args:
+        filename: 'epoch{epoch}_valid_loss{valid/loss:.4f}'
+        monitor: 'valid/loss'
+        mode: 'min'
+        every_n_epochs: 1
+        save_top_k: 5
+        auto_insert_metric_name: false
+        save_last: true
+        dirpath: '../checkpoints/evidential_crnn/'
+    - class_path: pytorch_lightning.callbacks.LearningRateMonitor
+      init_args:
+        logging_interval: epoch
+
+model:
+  input_dim: 4      # 2 mics * 2 (real + imag) = 4 channels
+  num_classes: 360  # Our output resolution
+  lr: 0.0005
+  dropout: 0.1
+  lamdba_peochs: 10 # This is a typo in their code, should be lambda_epochs
+
+data:
+  # data_dir is the main path passed to the datamodule.
+  # Other paths (csv_root, noise_root) are now hardcoded in evidential_realman_adapter.py
+  data_dir: 'C:/daniel/Thesis/SSL/ma_noisy_speech'
+  batch_size: [16, 8] # [train, val/test]
+  num_workers: 8
