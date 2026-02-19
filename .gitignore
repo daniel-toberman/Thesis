@@ -27,3 +27,5 @@ crnn features_old/
 hybrid_system/advanced_failure_detection/srp_features_end_result/
 
 crnn features new maybe bug/
+
+*.npz

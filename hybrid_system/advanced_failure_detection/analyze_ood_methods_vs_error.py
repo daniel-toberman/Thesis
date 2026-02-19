@@ -20,6 +20,7 @@ from knn_ood_routing import KNNOODRouter
 from mahalanobis_ood_routing import MahalanobisOODRouter
 from dice_ood_routing import DICEOODRouter
 from confidnet_routing import ConfidNetRouter
+from evidential_routing import EvidentialRouter
 
 # --- Configuration ---
 CONFIGS_3MIC = [
@@ -28,16 +29,22 @@ CONFIGS_3MIC = [
     '1_10_3_12_5_6_15_8_0', '9_2_3_4_13_6_15_8_0', '1_10_11_4_5_6_15_8_0',
     '9_10_3_12_5_6_7_16_0'
 ]
+# METHODS_TO_ANALYZE = {
+#     'GradNorm': GradNormOODRouter,
+#     'KNN (k=10)': lambda: KNNOODRouter(k=10),
+#     'Mahalanobis': MahalanobisOODRouter,
+#     'DICE (80%)': lambda: DICEOODRouter(clip_percentile=80),
+#     'ConfidNet': ConfidNetRouter,
+#     'Evidential': lambda: EvidentialRouter(MODEL_SAVE_PATH)
+# }
+
 METHODS_TO_ANALYZE = {
-    'GradNorm': GradNormOODRouter,
-    'KNN (k=10)': lambda: KNNOODRouter(k=10),
-    'Mahalanobis': MahalanobisOODRouter,
-    'DICE (80%)': lambda: DICEOODRouter(clip_percentile=80),
-    'ConfidNet': ConfidNetRouter
+    'Evidential': lambda: EvidentialRouter(MODEL_SAVE_PATH)
 }
 SCRIPT_DIR = Path(__file__).parent
 FEATURES_DIR = SCRIPT_DIR.parent.parent / 'crnn features'
 VAL_FEATURES_PATH = Path(r'C:\daniel\Thesis\hybrid_system\advanced_failure_detection\srp_features_end_result\train_combined_features.npz')
+MODEL_SAVE_PATH = SCRIPT_DIR / 'evidential_head.pth'
 RESULTS_DIR = SCRIPT_DIR / 'results' / 'ood_analysis'
 
 def load_features_from_config(config_name):
@@ -69,6 +76,8 @@ def get_scores(router, features):
         return np.array([s.mean() for s in dice_scores_per_frame])
     elif isinstance(router, ConfidNetRouter):
         return router.compute_scores(features)
+    elif isinstance(router, EvidentialRouter):
+        return router.compute_uncertainty(features)
     else:
         raise TypeError(f"Unsupported router type: {type(router)}")
 
