@@ -41,6 +41,8 @@ from llr_ood_routing import LLROODRouter
 from max_prob_routing import MaxProbRouter
 from oracle_ood_routing import BestOracleRouter
 from confidnet_routing import ConfidNetRouter
+from evidential_routing import EvidentialRouter
+
 
 def load_cached_srp_results(srp_path):
     """Load cached SRP predictions from a pickle file."""
@@ -157,7 +159,7 @@ def get_router_and_scores(method_name, features, val_features, srp_results, srp_
         'mahalanobis': MahalanobisOODRouter, 'gradnorm': GradNormOODRouter, 'vim': VIMOODRouter, 'she': SHEOODRouter,
         'dice_80': lambda: DICEOODRouter(clip_percentile=80), 'dice_90': lambda: DICEOODRouter(clip_percentile=90),
         'llr_gmm5': lambda: LLROODRouter(n_components=5), 'max_prob': MaxProbRouter,
-        'confidnet': ConfidNetRouter,
+        'confidnet': ConfidNetRouter, 'evidence': EvidentialRouter
     }
     
     base_method = method_name.split('_T')[0]
@@ -188,6 +190,7 @@ def get_router_and_scores(method_name, features, val_features, srp_results, srp_
         'llr_gmm5': lambda r, f: r.compute_llr_scores(f),
         'max_prob': lambda r, f: f['max_prob'],
         'confidnet': lambda r, f: r.compute_scores(f),
+        'evidence': lambda r, f: r.compute_uncertainty(f),
     }
 
     if base_method not in score_computation_methods:
@@ -313,7 +316,7 @@ def main():
     base_crnn_methods = [
         'energy', 'vim', 'she', 'gradnorm', 'max_prob', 'knn_k5', 'knn_k10', 
         'knn_k20', 'mc_dropout_entropy', 'mc_dropout_variance', 'dice_80', 
-        'dice_90', 'mahalanobis', 'confidnet'
+        'dice_90', 'mahalanobis', 'confidnet', 'evidence'
     ]
     
     methods_to_evaluate = [
@@ -329,9 +332,9 @@ def main():
         methods_to_evaluate.append(f'combo_{crnn_method}_div_srp_entropy')
         methods_to_evaluate.append(f'combo_{crnn_method}_mul_srp_max_prob')
 
-    # methods_to_evaluate = [
-    #     'confidnet'
-    # ]
+    methods_to_evaluate = [
+        'evidence'
+    ]
     srp_mic_config_files = glob.glob('srp_features_end_result/srp_results_mics_*.pkl')
     all_results = []
     

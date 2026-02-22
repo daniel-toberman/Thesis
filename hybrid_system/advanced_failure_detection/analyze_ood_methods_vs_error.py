@@ -44,7 +44,7 @@ METHODS_TO_ANALYZE = {
 SCRIPT_DIR = Path(__file__).parent
 FEATURES_DIR = SCRIPT_DIR.parent.parent / 'crnn features'
 VAL_FEATURES_PATH = Path(r'C:\daniel\Thesis\hybrid_system\advanced_failure_detection\srp_features_end_result\train_combined_features.npz')
-MODEL_SAVE_PATH = SCRIPT_DIR / 'evidential_head.pth'
+MODEL_SAVE_PATH = SCRIPT_DIR / 'evidential_head_72bins.pth'
 RESULTS_DIR = SCRIPT_DIR / 'results' / 'ood_analysis'
 
 def load_features_from_config(config_name):
